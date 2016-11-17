@@ -44,8 +44,8 @@ class InstructionSet:
         self.registers["acc"] *= self.interpret_address(value)
 
     @instruction(114)
-    def sub(self, value):
-        self.registers["acc"] -= self.interpret_address(value)
+    def div(self, value):
+        self.registers["acc"] /= self.interpret_address(value)
 
     @instruction(115)
     def set(self, value):
@@ -53,7 +53,6 @@ class InstructionSet:
 
     @instruction(116)
     def mov(self, from_loc, to_loc):
-        # move from register to location
         if to_loc.startswith("@"):
             self.registers[to_loc.lstrip(
                 "@")] = self.interpret_address(from_loc)
@@ -117,6 +116,10 @@ class InstructionSet:
         print(chr(self.interpret_address(memloc)))
 
     @instruction(130)
+    def printnl(self):
+        print("\n")
+
+    @instruction(131)
     def input(self, memloc):
         if memloc.startswith("@"):
             self.registers[memloc.strip("@").lower()] = int(
@@ -124,6 +127,14 @@ class InstructionSet:
         else:
             self.memory[int(memloc)] = int(input("Enter number: "))
 
-    @instruction(131)
+    @instruction(132)
     def halt(self):
         raise CpuStoppedCall("HALT command ran")
+
+    @instruction(133)
+    def movloc(self, from_loc, to_loc):
+        # move from location stored in location to location
+        if to_loc.startswith("@"):
+            self.registers[to_loc.lstrip("@")] = self.memory[self.interpret_address(from_loc)]
+        else:
+            self.memory[int(to_loc)] = self.memory[self.interpret_address(from_loc)]

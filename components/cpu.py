@@ -94,7 +94,7 @@ class Compiler:
             if not self.instruction_set.encode_name(op):  # is a label
                 if not op.startswith("_"):  # is a variable
                     self.labels[op] = str(label_counter)
-                    temporary_commands[i] = split[1]
+                    temporary_commands[i] = split[1] if len(split) > 1 else 0
                     label_counter += 1
 
         print(temporary_commands)
