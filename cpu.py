@@ -7,6 +7,7 @@ lastv2 1
 current 0
 maxiter 0
 input maxiter
+prntint maxiter
 _loopstart cmp maxiter
 leje end
 mov lastv1 @acc
