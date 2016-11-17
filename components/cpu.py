@@ -74,7 +74,9 @@ class Compiler:
     # Todo: add ability to compile program into a list of functors
 
     def __init__(self, program_string, memory_size):
-        self.program = [i for i in program_string.split('\n')]
+        self.program = [i for i in program_string.split('\n')] if \
+        isinstance(program_string, str) else program_string
+        # allow both string of commands and list of commands
         self.instruction_set = InstructionSet()
         self.memory_size = memory_size
         self.labels = {}
