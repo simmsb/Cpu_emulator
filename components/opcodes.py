@@ -5,19 +5,21 @@ instruction_map = {}
 instruction_names = {}
 
 
-def instruction(numerical):
+def instruction():
     def decorator(func):
-        instruction_map[numerical] = func
-        instruction_names[func.__name__] = numerical
+        number = 110 + len(instruction_map)
+        instruction_map[number] = func
+        instruction_names[func.__name__] = number
         return func
     return decorator
 
 
 class InstructionSet:
 
-    def __init__(self):
+    def __init__(self, cpu=None):  # no cpu needed for compiler
         self.encoded_commands = instruction_map.copy()
         self.instruction_names = instruction_names.copy()
+        self.cpu = cpu
 
     def run_encoded(self, command, *args):
         command = self.encoded_commands.get(command)
@@ -26,44 +28,44 @@ class InstructionSet:
                 command, args))'''
             command(self, *args)
         else:
-            raise CpuStoppedCall("Invalid command/ Halt Raised")
+            raise CpuStoppedCall("Invalid command entered, ID was: {}. Arguments were: {}".format(command, args))
 
     def encode_name(self, command_name):
         return self.instruction_names.get(command_name)
 
-    @instruction(111)
+    @instruction()
     def add(self, value):
-        self.registers["acc"] += self.interpret_address(value)
+        self.cpu.registers["acc"] += self.cpu.interpret_address(value)
 
-    @instruction(112)
+    @instruction()
     def sub(self, value):
-        self.registers["acc"] -= self.interpret_address(value)
+        self.cpu.registers["acc"] -= self.cpu.interpret_address(value)
 
-    @instruction(113)
+    @instruction()
     def mul(self, value):
-        self.registers["acc"] *= self.interpret_address(value)
+        self.cpu.registers["acc"] *= self.cpu.interpret_address(value)
 
-    @instruction(114)
+    @instruction()
     def div(self, value):
-        self.registers["acc"] /= self.interpret_address(value)
+        self.cpu.registers["acc"] /= self.cpu.interpret_address(value)
 
-    @instruction(115)
+    @instruction()
     def set(self, value):
-        self.registers["acc"] = self.interpret_address(value)
+        self.cpu.registers["acc"] = self.cpu.interpret_address(value)
 
-    @instruction(116)
+    @instruction()
     def mov(self, from_loc, to_loc):
         if to_loc.startswith("@"):
-            self.registers[to_loc.lstrip(
-                "@")] = self.interpret_address(from_loc)
+            self.cpu.registers[to_loc.lstrip(
+                "@")] = self.cpu.interpret_address(from_loc)
         else:
-            self.memory[int(to_loc)] = self.interpret_address(from_loc)
+            self.cpu.memory[int(to_loc)] = self.cpu.interpret_address(from_loc)
 
-    @instruction(117)
+    @instruction()
     def cmp(self, a, b=0):
-        av = self.interpret_address(a)
+        av = self.cpu.interpret_address(a)
         # print("comp interpreted as {}".format(av))
-        bv = self.interpret_address(b) if b else 0
+        bv = self.cpu.interpret_address(b) if b else 0
         functions = [
             (lambda a, b: a < b),
             (lambda a, b: a > b),
@@ -71,70 +73,85 @@ class InstructionSet:
             (lambda a, b: a >= b),
             (lambda a, b: a == b)
         ]
-        self.registers["cmp"] = "".join(
+        self.cpu.registers["cmp"] = "".join(
             [str(1 if i(av, bv) else 0) for i in functions])
 
-    @instruction(118)
+    @instruction()
     def jump(self, jump):
-        self.registers["cur"] = self.interpret_address(jump)
+        self.cpu.registers["cur"] = self.cpu.interpret_address(jump)
 
-    @instruction(119)
+    @instruction()
     def _test_cmp(self, index):
-        return int(self.registers["cmp"][index])
+        return int(self.cpu.registers["cmp"][index])
 
-    @instruction(120)
+    @instruction()
     def lje(self, jump):  # less than
         if self._test_cmp(0):
             self.jump(jump)
 
-    @instruction(121)
+    @instruction()
     def mje(self, jump):  # more than
         if self._test_cmp(1):
             self.jump(jump)
 
-    @instruction(122)
+    @instruction()
     def leje(self, jump):  # less than equal
         if self._test_cmp(2):
             self.jump(jump)
 
-    @instruction(123)
+    @instruction()
     def meje(self, jump):  # more than equal
         if self._test_cmp(3):
             self.jump(jump)
 
-    @instruction(124)
+    @instruction()
     def eqje(self, jump):  # equal
         if self._test_cmp(4):
             self.jump(jump)
 
-    @instruction(128)
+    @instruction()
     def prntint(self, memloc):
-        print(self.interpret_address(memloc))
+        print(self.cpu.interpret_address(memloc))
 
-    @instruction(129)
+    @instruction()
     def prntstr(self, memloc):
-        print(chr(self.interpret_address(memloc)))
+        print(chr(self.cpu.interpret_address(memloc)))
 
-    @instruction(130)
-    def printnl(self):
+    @instruction()
+    def prntnl(self):
         print("\n")
 
-    @instruction(131)
+    @instruction()
     def input(self, memloc):
         if memloc.startswith("@"):
-            self.registers[memloc.strip("@").lower()] = int(
+            self.cpu.registers[memloc.strip("@").lower()] = int(
                 input("Enter number: "))
         else:
-            self.memory[int(memloc)] = int(input("Enter number: "))
+            self.cpu.memory[int(memloc)] = int(input("Enter number: "))
 
-    @instruction(132)
+    @instruction()
     def halt(self):
-        raise CpuStoppedCall("HALT command ran")
+        raise CpuStoppedCall("CPU halt triggered")
 
-    @instruction(133)
+    @instruction()
     def movloc(self, from_loc, to_loc):
         # move from location stored in location to location
         if to_loc.startswith("@"):
-            self.registers[to_loc.lstrip("@")] = self.memory[self.interpret_address(from_loc)]
+            self.cpu.registers[to_loc.lstrip("@")] = self.cpu.memory[self.cpu.interpret_address(from_loc)]
         else:
-            self.memory[int(to_loc)] = self.memory[self.interpret_address(from_loc)]
+            self.cpu.memory[int(to_loc)] = self.cpu.memory[self.cpu.interpret_address(from_loc)]
+
+    @instruction()
+    def popstk(self, memloc):
+        if self.cpu.registers["stk"] > self.cpu.memory.size:
+            return 0  # assume everything above maximum address is 0
+        if memloc.startswith("@"):
+            self.cpu.registers[memloc.lstrip("@")] = self.cpu.memory[self.cpu.registers["stk"]]
+        else:
+            self.cpu.memory[int(memloc)] = self.cpu.memory[self.cpu.registers["stk"]]
+        self.cpu.registers["stk"] += 1  # stack descends upwardas
+
+    @instruction()
+    def pushstk(self, value):
+        self.cpu.registers["stk"] -= 1  # decrement first since last push will leave us one below
+        self.cpu.memory[self.cpu.registers["stk"]] = self.cpu.interpret_address(value)

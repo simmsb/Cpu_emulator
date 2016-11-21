@@ -2,54 +2,59 @@ from .opcodes import *
 from .memory import *
 
 
+DEBUG = False
+
+
 class Registers:
 
-    def __init__(self):
-        self.register_map = {
+    def __init__(self, mem_size):
+        self.registers = {
             "cur": 0,  # current instruction
-            "acc": 1,  # accumulator
-            "rax": 2,  # function return
-            "eax": 3,  # general purpose
-            "ret": 4,  # function return to
-            "cmp": 5,  # last comparison [L, M, Le, Me, Eq, L0, M0, Eq0]
+            "acc": 0,  # accumulator
+            "rax": 0,  # function return
+            "eax": 0,  # general purpose
+            "ret": 0,  # function return to
+            "stk": mem_size-1,  # current stack position, start at last memory position
+            "cmp": '00000'  # last comparison [L, M, Le, Me, Eq, L0, M0, Eq0]
         }
-        self.register_memory = [0 for i in range(len(self.register_map) - 1)]
-        self.register_memory.append('00000')
 
     def __getitem__(self, key):
-        return self.register_memory[self.register_map[key]]
+        if self.registers.get(key) is None:
+            raise CpuStoppedCall("Attemt to access nonexistant register")
+        return self.registers.get(key)
 
     def __setitem__(self, key, value):
-        self.register_memory[self.register_map[key]] = value
+        if self.registers.get(key) is not None:
+            self.registers[key] = value
+        else:
+            raise CpuStoppedCall("Attemt to access nonexistant register")
 
 
-class Cpu(InstructionSet):
+class Cpu:
 
     def __init__(self, memory_capacity, program=[]):
         super().__init__()
         self.memory = Memory(memory_capacity, 0)
         if program:
             self.memory.load_program(program)
-        self.registers = Registers()
-
-    def decode_string_command(self, string):
-        codes = string.lower().split()
-        opcode = codes.pop(0)
-        self.execute_command(opcode, *codes)
+        self.registers = Registers(self.memory.size)
+        self.instruction_set = InstructionSet(self)
 
     def split_every(self, string, n):
         n = max(1, n)
         return [string[i:i + n] for i in range(0, len(string), n)]
 
     def decode_numeric_command(self, value):
+        if value is 0:
+            raise CpuStoppedCall("CPU halted: no command")
+            # empty memory address, stop here
         opcode = int(str(value)[:3])
         split_codes = self.split_every(str(value)[3:], 8)
         operands = ''.join([chr(int(i)) for i in split_codes]).split()
-        self.run_encoded(opcode, *operands)
-
-    def execute_command(self, opcode, *codes):
-        command = self.__getattribute__(opcode)
-        command(*codes)
+        if DEBUG:
+            print("Opcode was: {}".format(opcode))
+            print("Operands were: {}".format(operands))
+        self.instruction_set.run_encoded(opcode, *operands)
 
     def interpret_address(self, string):
         '''#3 for immediate
@@ -66,7 +71,8 @@ class Cpu(InstructionSet):
                 instruction = self.memory[self.registers["cur"]]
                 self.registers["cur"] += 1  # increment counter
                 self.decode_numeric_command(instruction)
-            except CpuStoppedCall:
+            except CpuStoppedCall as e:
+                print(e)
                 break
 
 
