@@ -22,6 +22,7 @@ RAX  < general purpose register (ideally store function returns here)
 EAX  < general purpose register
 RET  < function jump return
 CMP  < last comparison register. (unlike the others, this contains a string, dont touch it and you'll be fine)
+STK  < current stack position (leave it for popstk and pushstk to handle)
 ```
 
 Variables are assigned as any non-command word followed by a initial value (if none provided, it is set to 0)
@@ -49,6 +50,8 @@ PRNTNL  <- prints a newline on stdout
 INPUT <@/ Memloc>  <- waits for user input on the command line and saves it into specified location
 HALT  <- computer stops operation
 MOVLOC <@/ Memloc (from)> <@/ Memloc (to)>  <- Moves contents of memory location at location 1 to location 2
+PUSHSTK <@/ #/ Value>  <- push value to stack
+POPSTK <@/ Memloc>
 ```
 
 Python stuff:
@@ -72,4 +75,3 @@ Create a CPU object with the compiled program and specified memory size (dont ch
 mycpu.execute()
 ```
 Start executing commands from memory location 0.
-
