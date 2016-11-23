@@ -89,6 +89,10 @@ class Compiler:
         self.named_jumps = {}
         self.compiled = []
 
+    @staticmethod
+    def replace_with_spaces(string, search, replace):
+        return " ".join([ replace if i == search else i for i in string.split()])
+
     def preprocess(self, commands):
         label_counter = 1  # leave room for jump at start
         temporary_commands = commands.copy()
@@ -122,9 +126,9 @@ class Compiler:
                 print(split)
                 temp = i
                 for k, j in self.labels.items():
-                    temp = temp.replace(k, j)
+                    temp = self.replace_with_spaces(temp, k, j)
                 for k, j in self.named_jumps.items():
-                    temp = temp.replace(k, j)
+                    temp = self.replace_with_spaces(temp, k, j)
                 return_commands.append(temp)
             elif op.isdigit():
                 # if it is a number, keep it anyway

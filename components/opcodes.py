@@ -115,7 +115,7 @@ class InstructionSet:
 
     @instruction()
     def prntstr(self, memloc):
-        print(chr(self.cpu.interpret_address(memloc)))
+        print(chr(self.cpu.interpret_address(memloc)), end='')
 
     @instruction()
     def prntnl(self):
