@@ -28,7 +28,8 @@ class InstructionSet:
                 command, args))'''
             command(self, *args)
         else:
-            raise CpuStoppedCall("Invalid command entered, ID was: {}. Arguments were: {}".format(command, args))
+            raise CpuStoppedCall(
+                "Invalid command entered, ID was: {}. Arguments were: {}".format(command, args))
 
     def encode_name(self, command_name):
         return self.instruction_names.get(command_name)
@@ -137,21 +138,52 @@ class InstructionSet:
     def movloc(self, from_loc, to_loc):
         # move from location stored in location to location
         if to_loc.startswith("@"):
-            self.cpu.registers[to_loc.lstrip("@")] = self.cpu.memory[self.cpu.interpret_address(from_loc)]
+            self.cpu.registers[to_loc.lstrip("@")] = self.cpu.memory[
+                self.cpu.interpret_address(from_loc)]
         else:
-            self.cpu.memory[int(to_loc)] = self.cpu.memory[self.cpu.interpret_address(from_loc)]
+            self.cpu.memory[int(to_loc)] = self.cpu.memory[
+                self.cpu.interpret_address(from_loc)]
 
     @instruction()
     def popstk(self, memloc):
         if self.cpu.registers["stk"] > self.cpu.memory.size:
             return 0  # assume everything above maximum address is 0
         if memloc.startswith("@"):
-            self.cpu.registers[memloc.lstrip("@")] = self.cpu.memory[self.cpu.registers["stk"]]
+            self.cpu.registers[memloc.lstrip("@")] = self.cpu.memory[
+                self.cpu.registers["stk"]]
         else:
-            self.cpu.memory[int(memloc)] = self.cpu.memory[self.cpu.registers["stk"]]
+            self.cpu.memory[int(memloc)] = self.cpu.memory[
+                self.cpu.registers["stk"]]
         self.cpu.registers["stk"] += 1  # stack descends upwardas
 
     @instruction()
     def pushstk(self, value):
-        self.cpu.registers["stk"] -= 1  # decrement first since last push will leave us one below
-        self.cpu.memory[self.cpu.registers["stk"]] = self.cpu.interpret_address(value)
+        # decrement first since last push will leave us one below
+        self.cpu.registers["stk"] -= 1
+        self.cpu.memory[self.cpu.registers["stk"]
+                        ] = self.cpu.interpret_address(value)
+
+    @instruction()
+    def call(self, function_location, *args):
+        self.pushstk("#{}".format(self.cpu.registers["cur"] + 1))  # push return address to stack
+        for i in args:
+            self.pushstk(i)  # push vars to stack
+        self.jump(function_location)
+
+    def _pop_stk_py(self):
+        if self.cpu.registers["stk"] > self.cpu.memory.size:
+            return 0
+        pre = self.cpu.memory[self.cpu.registers["stk"]]
+        self.cpu.registers["stk"] += 1
+        return pre
+
+    @instruction()
+    def ret(self, *args):
+        ret_loc = self. _pop_stk_py()
+        for i in args:
+            self.pushstk(i)
+        self.jump(ret_loc)
+
+    @instruction()
+    def nop(self):
+        pass
