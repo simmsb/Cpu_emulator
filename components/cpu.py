@@ -60,6 +60,7 @@ class Cpu:
         '''#3 for immediate
         @reg for register
         3 for memory_location'''
+        string = str(string)
         def interpret_memory_location(string):
             return self.registers[string.lstrip("@")] if string.startswith("@") else self.memory[int(string)]
 
@@ -104,10 +105,9 @@ class Compiler:
             if not self.instruction_set.encode_name(op):  # is a label
                 if not op.startswith("_"):  # is a variable
                     self.labels[op] = str(label_counter)
-                    temporary_commands[i] = split[1] if len(split) > 1 else 0
+                    temporary_commands.remove(c)  # cut from list
+                    temporary_commands.insert(label_counter-1, split[1] if len(split) > 1 else 0)  # always move to front
                     label_counter += 1
-
-        print(temporary_commands)
 
         for i, c in enumerate(temporary_commands):  # generate jumps
             split = c.split()
@@ -117,13 +117,11 @@ class Compiler:
                     self.named_jumps[op[1:]] = "#{}".format(str(i + 1))
                     temporary_commands[i] = " ".join(split[1:])
 
-        print(temporary_commands)
 
         for i in temporary_commands:
             split = i.split()
             op = split[0]  # type: str
             if self.instruction_set.encode_name(op):  # is a command
-                print(split)
                 temp = i
                 for k, j in self.labels.items():
                     temp = self.replace_with_spaces(temp, k, j)

@@ -1,0 +1,15 @@
+jump start
+_addvar nop
+popstk @acc
+popstk @eax
+add @eax
+ret @acc
+_start nop
+varA 0
+input varA
+varB 0
+input varB
+call addvar varA varB
+popstk varA
+prntint varA
+halt

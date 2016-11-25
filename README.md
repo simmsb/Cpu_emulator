@@ -52,6 +52,8 @@ HALT  <- computer stops operation
 MOVLOC <@/ Memloc (from)> <@/ Memloc (to)>  <- Moves contents of memory location at location 1 to location 2
 PUSHSTK <@/ #/ Value>  <- push value to stack
 POPSTK <@/ Memloc>
+CALL <function> *<@/ #/ Value>  <- Call function (jump address) with arguments (syntax sugar for pushing onto stack (left to right) then jumping (handles return address for you))
+RET *<@/ #/ Values>  <- Return from current function with arguments (arguments are loaded left to right)
 ```
 
 Python stuff:

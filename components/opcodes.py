@@ -77,9 +77,12 @@ class InstructionSet:
         self.cpu.registers["cmp"] = "".join(
             [str(1 if i(av, bv) else 0) for i in functions])
 
+    def internal_jump(self, location):  # jumps to memory address provided, no interpreting
+        self.cpu.registers["cur"] = location
+
     @instruction()
     def jump(self, jump):
-        self.cpu.registers["cur"] = self.cpu.interpret_address(jump)
+        self.internal_jump(self.cpu.interpret_address(jump))
 
     @instruction()
     def _test_cmp(self, index):
@@ -163,9 +166,13 @@ class InstructionSet:
         self.cpu.memory[self.cpu.registers["stk"]
                         ] = self.cpu.interpret_address(value)
 
+    def _push_stk_py(self, value):
+        self.cpu.registers["stk"] -= 1
+        self.cpu.memory[self.cpu.registers["stk"]] = value
+
     @instruction()
     def call(self, function_location, *args):
-        self.pushstk("#{}".format(self.cpu.registers["cur"] + 1))  # push return address to stack
+        self._push_stk_py(self.cpu.registers["cur"])  # push return address to stack
         for i in args:
             self.pushstk(i)  # push vars to stack
         self.jump(function_location)
@@ -179,10 +186,10 @@ class InstructionSet:
 
     @instruction()
     def ret(self, *args):
-        ret_loc = self. _pop_stk_py()
+        ret_loc = self._pop_stk_py()
         for i in args:
             self.pushstk(i)
-        self.jump(ret_loc)
+        self.internal_jump(ret_loc)
 
     @instruction()
     def nop(self):
