@@ -15,7 +15,7 @@ class Registers:
             "eax": 0,  # general purpose
             "ret": 0,  # function return to
             "stk": mem_size-1,  # current stack position, start at last memory position
-            "cmp": '00000'  # last comparison [L, M, Le, Me, Eq, L0, M0, Eq0]
+            "cmp": '00000'  # last comparison [less, more, less equal, more equal equal]
         }
 
     def __getitem__(self, key):
@@ -65,84 +65,94 @@ class Cpu:
             print("exception was: {}".format(e))
             raise CpuStoppedCall("Computer Crashed Halt")
 
-
     def interpret_address(self, string):
         '''#3 for immediate
         @reg for register
         3 for memory_location'''
         string = str(string)
-        def interpret_memory_location(string):
-            return self.registers[string.lstrip("@")] if string.startswith("@") else self.memory[int(string)]
+
+        def interpret_memory_location(location_string):
+            return self.registers[location_string.lstrip("@")] if location_string.startswith("@") else \
+                                                                        self.memory[int(location_string)]
 
         return int(string.lstrip("#")) if string.startswith("#") else interpret_memory_location(string)
 
     def execute(self):
         while True:
             try:
-                instruction = self.memory[self.registers["cur"]]
+                current_instruction = self.memory[self.registers["cur"]]
                 self.registers["cur"] += 1  # increment counter
-                self.decode_numeric_command(instruction)
+                self.decode_numeric_command(current_instruction)
             except CpuStoppedCall as e:
                 print(e)
                 break
-            
+
+
 class Compiler:
     # Todo: add ability to compile program into a list of functors
 
     def __init__(self, program_string, memory_size):
         self.program = [i for i in program_string.split('\n')] if \
-        isinstance(program_string, str) else program_string
+                isinstance(program_string, str) else program_string
         # allow both string of commands and list of commands
         self.instruction_set = InstructionSet()
         self.memory_size = memory_size
-        self.labels = {}
         self.named_jumps = {}
         self.compiled = []
 
     @staticmethod
     def replace_with_spaces(string, search, replace):
-        return " ".join([ replace if i == search else i for i in string.split()])
+        '''Replace individual words, no fuzzyness'''
+        return " ".join([replace if i == search else i for i in string.split()])
 
-    def preprocess(self, commands):
-        label_counter = 1  # leave room for jump at start
-        temporary_commands = commands.copy()
-        return_commands = []
+    def pre_process_instructions(self, commands):
+        return_commands = list()
+        labels = dict()
+        label_values = list()
+        counter = 0
 
-        for i, c in enumerate(commands):  # remove variables
+        def comment_empty_filter(line):
+            '''Remove comments and empty lines
+            returns None if line ended up being empty'''
+            return line.split(";")[0].rstrip() or None
+
+        temporary_commands = list(filter(None, map(comment_empty_filter, commands)))
+        label_commands = temporary_commands.copy()
+        for i, c in enumerate(label_commands):  # remove constant variables and empty lines
             split = c.split()
             op = split[0]
-            if not self.instruction_set.encode_name(op):  # is a label
-                if not op.startswith("_"):  # is a variable
-                    self.labels[op] = str(label_counter)
-                    temporary_commands.remove(c)  # cut from list
-                    temporary_commands.insert(label_counter-1, split[1] if len(split) > 1 else 0)  # always move to front
-                    label_counter += 1
+
+            if not self.instruction_set.encode_name(op) and not op.startswith("_"):
+                labels[op] = counter
+                label_values.append(int(split[1]) if len(split) > 1 else 0)
+                temporary_commands.remove(c)  # cut from list
+                counter += 1
 
         for i, c in enumerate(temporary_commands):  # generate jumps
             split = c.split()
             op = split[0]
             if not self.instruction_set.encode_name(op):  # is a jump
                 if op.startswith("_"):  # is a jump
-                    self.named_jumps[op[1:]] = "#{}".format(str(i + 1))
+                    self.named_jumps[op[1:]] = "#{}".format(str(i))
                     temporary_commands[i] = " ".join(split[1:])
 
+        program_length = len(temporary_commands)
 
         for i in temporary_commands:
             split = i.split()
             op = split[0]  # type: str
             if self.instruction_set.encode_name(op):  # is a command
                 temp = i
-                for k, j in self.labels.items():
-                    temp = self.replace_with_spaces(temp, k, j)
+                for k, j in labels.items():
+                    temp = self.replace_with_spaces(temp, k, str(program_length + j))
                 for k, j in self.named_jumps.items():
                     temp = self.replace_with_spaces(temp, k, j)
                 return_commands.append(temp)
             elif op.isdigit():
                 # if it is a number, keep it anyway
                 return_commands.append(int(op))
-
-        return_commands.insert(0, "jump #{}".format(len(self.labels) + 1))
-
+        for i in label_values:
+            return_commands.append(i)  # add initialised variable to end of program
         return return_commands
 
     def compile_command(self, command_str):
@@ -158,7 +168,7 @@ class Compiler:
             raise Exception
 
     def compile(self):
-        self.program = self.preprocess(self.program)
+        self.program = self.pre_process_instructions(self.program)
         print("Program = {}".format(self.program))
         for c, i in enumerate(self.program):
             try:

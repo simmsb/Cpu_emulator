@@ -67,6 +67,7 @@ class InstructionSet:
         av = self.cpu.interpret_address(a)
         # print("comp interpreted as {}".format(av))
         bv = self.cpu.interpret_address(b) if b else 0
+
         functions = [
             (lambda a, b: a < b),
             (lambda a, b: a > b),

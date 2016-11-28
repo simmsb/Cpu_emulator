@@ -27,10 +27,17 @@ STK  < current stack position (leave it for popstk and pushstk to handle)
 
 Variables are assigned as any non-command word followed by a initial value (if none provided, it is set to 0)
 for example ```myVariable 5```, this can be accessed again at any time with ```myVariable```. Note that the way the program is compiled, all instances of the varible name are replaced with it's assigned memory location, so you can't do ```#myVariable``` to get to a memory location contained in a memory location, instead you should use the command ```fromloc <from> <to>``` which will retrieve the contents of the memory location stored at a loction.
+Note that all variables are removed from the command list and placed at the end of the program,
+because of this you should not mix use of absolute location memory references and labels, as the index of a location could change depending on whether it was in front of or behind a label.
+Also, variables have no scope, they are always global, use the stack if you want to have semi scoped function variables
+
 
 Jump labels are assigned as any word starting with the character ```_```, and should be referenced with the name without the ```_```
 an example of a jump label would be: ```_myJump```. Jump definitions should always precede a command (for example: ```_myJump mov @acc myVar```
 You would then jump to that location with ```jump myVar```
+You should always use jump labels instead of absolute references, as the index of a command/ function can change depending on where you defined variables
+
+Comments start with ```;```, there are no multi line comments, only lines starting with ```;``` only. whitespace between the last operand and the comment is sorted for you.
 
 #Okay, Time for the command list
 
@@ -55,6 +62,9 @@ POPSTK <@/ Memloc>
 CALL <function> *<@/ #/ Value>  <- Call function (jump address) with arguments (syntax sugar for pushing onto stack (left to right) then jumping (handles return address for you))
 RET *<@/ #/ Values>  <- Return from current function with arguments (arguments are loaded left to right)
 ```
+
+Look into the directory: ```example programs``` for some examples.
+
 
 Python stuff:
 

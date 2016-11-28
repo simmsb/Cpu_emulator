@@ -1,28 +1,35 @@
-jump start
+varA 0
+input varA
+varB 0
+input varB
+; initialise variables (ideally we shouldn't do this and just have a compiler
+; automatically determine when it can overwrite an unused variable
+call addvar varA varB
+popstk varA
+prntint varA
+
+call recurse #400
+
+popstk @eax
+prntint @eax
+
+halt
+
 _addvar nop
 popstk @acc
 popstk @eax
 add @eax
 ret @acc
+
 _recurse nop
+
 popstk @acc
 prntint @acc
 sub #1
 cmp @acc
-lje recreturn
-call recurse @acc
-popstk @eax
-prntint @eax
+lje recreturn  ; if jump to return function, begin return chain
+call recurse @acc  ; otherwise call self again
+
+popstk @eax ; pop what is returned from function when it starts the return chain
+prntint @eax ; print what is returned
 _recreturn ret @acc
-_start nop
-varA 0
-input varA
-varB 0
-input varB
-call addvar varA varB
-popstk varA
-prntint varA
-call recurse #400
-popstk @eax
-prntint @eax
-halt
