@@ -17,7 +17,6 @@ def instruction():
 def exception_wrapper(func):
     def decorator(*args):
         try:
-            print("executing function")
             return func(*args)
         except TypeError:
             raise Exception("Instruction received invalid amount of arguments",
