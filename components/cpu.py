@@ -48,13 +48,23 @@ class Cpu:
         if value is 0:
             raise CpuStoppedCall("CPU halted: no command")
             # empty memory address, stop here
-        opcode = int(str(value)[:3])
-        split_codes = self.split_every(str(value)[3:], 8)
-        operands = ''.join([chr(int(i)) for i in split_codes]).split()
-        if DEBUG:
-            print("Opcode was: {}".format(opcode))
-            print("Operands were: {}".format(operands))
-        self.instruction_set.run_encoded(opcode, *operands)
+        try:
+            opcode = int(str(value)[:3])
+            split_codes = self.split_every(str(value)[3:], 8)
+            operands = ''.join([chr(int(i)) for i in split_codes]).split()
+            if DEBUG:
+                print("Opcode was: {}".format(opcode))
+                print("Operands were: {}".format(operands))
+            self.instruction_set.run_encoded(opcode, *operands)
+        except CpuStoppedCall as e:
+            raise e  # re-raise here so we can ignore it
+        except Exception as e:
+            print("Computer crashed!")
+            print("Last instruction was: {}".format(opcode))
+            print("operands were: {}".format(operands))
+            print("exception was: {}".format(e))
+            raise CpuStoppedCall("Computer Crashed Halt")
+
 
     def interpret_address(self, string):
         '''#3 for immediate
@@ -75,8 +85,7 @@ class Cpu:
             except CpuStoppedCall as e:
                 print(e)
                 break
-
-
+            
 class Compiler:
     # Todo: add ability to compile program into a list of functors
 
