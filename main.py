@@ -24,7 +24,6 @@ with open(program) as commandList:
 
 
 myprogram = Compiler(commands, MEMORY_SIZE)
-myprogram.compile()
 
 mycpu = Cpu(MEMORY_SIZE, myprogram.compiled)
 

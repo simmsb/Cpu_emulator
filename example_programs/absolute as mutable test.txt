@@ -1,0 +1,2 @@
+mov #4 #2 ; this should not happen
+halt

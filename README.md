@@ -71,12 +71,8 @@ Python stuff:
 ```
 myprogram = Compiler(List or string of commands, Default memory size)
 ```
-This will create a compiler object ready to compile your program
+This will create a compiler object and compile the program, accessible with ```myprogram.compiled```
 
-```
-myprogram.compile()
-```
-Compile the program
 
 ```
 mycpu = Cpu(MEMORY_SIZE, myprogram.compiled)

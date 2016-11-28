@@ -6,15 +6,24 @@ DEBUG = False
 
 
 class Registers:
+    """Object that holds the registers for the computer
 
-    def __init__(self, mem_size):
+    Has getitem and setitem overrides, so can be treated like a dictionary containing the registers
+
+    Arguments
+    ---------
+
+    memory_size: <int> Size of memory the cpu is given
+    """
+
+    def __init__(self, memory_size):
         self.registers = {
             "cur": 0,  # current instruction
             "acc": 0,  # accumulator
             "rax": 0,  # function return
             "eax": 0,  # general purpose
             "ret": 0,  # function return to
-            "stk": mem_size-1,  # current stack position, start at last memory position
+            "stk": memory_size,  # current stack position, start at last memory position
             "cmp": '00000'  # last comparison [less, more, less equal, more equal equal]
         }
 
@@ -31,8 +40,22 @@ class Registers:
 
 
 class Cpu:
+    """CPU that links instructions, memory and registers together
 
-    def __init__(self, memory_capacity, program=[]):
+    Arguments
+    ---------
+
+    memory_capacity: <int> base length of program
+
+    program: <iterator> Iterator/ list of instructions to load memory with
+
+
+    functions
+    ---------
+
+    execute(): Begin execution of program"""
+
+    def __init__(self, memory_capacity, program=None):
         super().__init__()
         self.memory = Memory(memory_capacity, 0)
         if program:
@@ -40,17 +63,18 @@ class Cpu:
         self.registers = Registers(self.memory.size)
         self.instruction_set = InstructionSet(self)
 
-    def split_every(self, string, n):
+    @staticmethod
+    def _split_every(string, n):
         n = max(1, n)
         return [string[i:i + n] for i in range(0, len(string), n)]
 
-    def decode_numeric_command(self, value):
+    def _decode_numeric_command(self, value):
         if value is 0:
             raise CpuStoppedCall("CPU halted: no command")
             # empty memory address, stop here
         try:
             opcode = int(str(value)[:3])
-            split_codes = self.split_every(str(value)[3:], 8)
+            split_codes = self._split_every(str(value)[3:], 8)
             operands = ''.join([chr(int(i)) for i in split_codes]).split()
             if DEBUG:
                 print("Opcode was: {}".format(opcode))
@@ -60,15 +84,15 @@ class Cpu:
             raise e  # re-raise here so we can ignore it
         except Exception as e:
             print("Computer crashed!")
-            print("Last instruction was: {}".format(opcode))
+            print("Last instruction was: {}".format(self.instruction_set.encoded_commands[opcode].__name__))
             print("operands were: {}".format(operands))
             print("exception was: {}".format(e))
             raise CpuStoppedCall("Computer Crashed Halt")
 
     def interpret_address(self, string):
-        '''#3 for immediate
+        """#3 for immediate
         @reg for register
-        3 for memory_location'''
+        3 for memory_location"""
         string = str(string)
 
         def interpret_memory_location(location_string):
@@ -82,14 +106,27 @@ class Cpu:
             try:
                 current_instruction = self.memory[self.registers["cur"]]
                 self.registers["cur"] += 1  # increment counter
-                self.decode_numeric_command(current_instruction)
+                self._decode_numeric_command(current_instruction)
             except CpuStoppedCall as e:
                 print(e)
                 break
 
 
 class Compiler:
-    # Todo: add ability to compile program into a list of functors
+    """Object that compiles a program for an instruction set
+
+    Arguments
+    ---------
+
+    program_string: <List> or newline seperated string of instructions
+
+    memory_size: <int> size of memory cells to give the program
+
+
+    Functions
+    ---------
+
+    compiled: returns map object of compiled commands"""
 
     def __init__(self, program_string, memory_size):
         self.program = [i for i in program_string.split('\n')] if \
@@ -97,26 +134,25 @@ class Compiler:
         # allow both string of commands and list of commands
         self.instruction_set = InstructionSet()
         self.memory_size = memory_size
-        self.named_jumps = {}
-        self.compiled = []
 
     @staticmethod
-    def replace_with_spaces(string, search, replace):
-        '''Replace individual words, no fuzzyness'''
+    def _replace_with_spaces(string, search, replace):
+        """Replace individual words, no fuzzyness"""
         return " ".join([replace if i == search else i for i in string.split()])
 
-    def pre_process_instructions(self, commands):
+    def _pre_process_instructions(self, commands):
         return_commands = list()
         labels = dict()
+        named_jumps = dict()
         label_values = list()
         counter = 0
 
-        def comment_empty_filter(line):
-            '''Remove comments and empty lines
-            returns None if line ended up being empty'''
+        def _comment_empty_filter(line):
+            """Remove comments and empty lines
+            returns None if line ended up being empty"""
             return line.split(";")[0].rstrip() or None
 
-        temporary_commands = list(filter(None, map(comment_empty_filter, commands)))
+        temporary_commands = list(filter(None, map(_comment_empty_filter, commands)))
         label_commands = temporary_commands.copy()
         for i, c in enumerate(label_commands):  # remove constant variables and empty lines
             split = c.split()
@@ -133,7 +169,7 @@ class Compiler:
             op = split[0]
             if not self.instruction_set.encode_name(op):  # is a jump
                 if op.startswith("_"):  # is a jump
-                    self.named_jumps[op[1:]] = "#{}".format(str(i))
+                    named_jumps[op[1:]] = "#{}".format(str(i))
                     temporary_commands[i] = " ".join(split[1:])
 
         program_length = len(temporary_commands)
@@ -144,9 +180,9 @@ class Compiler:
             if self.instruction_set.encode_name(op):  # is a command
                 temp = i
                 for k, j in labels.items():
-                    temp = self.replace_with_spaces(temp, k, str(program_length + j))
-                for k, j in self.named_jumps.items():
-                    temp = self.replace_with_spaces(temp, k, j)
+                    temp = self._replace_with_spaces(temp, k, str(program_length + j))
+                for k, j in named_jumps.items():
+                    temp = self._replace_with_spaces(temp, k, j)
                 return_commands.append(temp)
             elif op.isdigit():
                 # if it is a number, keep it anyway
@@ -155,7 +191,7 @@ class Compiler:
             return_commands.append(i)  # add initialised variable to end of program
         return return_commands
 
-    def compile_command(self, command_str):
+    def _compile_command(self, command_str):
         if isinstance(command_str, int):
             return command_str  # if just a number, keep it
         keys = command_str.split()
@@ -167,12 +203,7 @@ class Compiler:
         else:
             raise Exception
 
-    def compile(self):
-        self.program = self.pre_process_instructions(self.program)
-        print("Program = {}".format(self.program))
-        for c, i in enumerate(self.program):
-            try:
-                self.compiled.append(self.compile_command(i))
-            except:
-                raise Exception(
-                    "Invalid command passed: ({}) on line {}".format(i, c))
+    @property
+    def compiled(self):
+        processed = self._pre_process_instructions(self.program)
+        return map(self._compile_command, processed)
