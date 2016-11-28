@@ -186,6 +186,7 @@ class InstructionSet:
 
     @instruction()
     def ret(self, *args):
+        #print("returning with args: {}".format(args))
         ret_loc = self._pop_stk_py()
         for i in args:
             self.pushstk(i)
