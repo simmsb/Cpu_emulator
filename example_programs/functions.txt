@@ -4,6 +4,16 @@ popstk @acc
 popstk @eax
 add @eax
 ret @acc
+_recurse nop
+popstk @acc
+prntint @acc
+sub #1
+cmp @acc
+lje recreturn
+call recurse @acc
+popstk @eax
+prntint @eax
+_recreturn ret @acc
 _start nop
 varA 0
 input varA
@@ -12,4 +22,7 @@ input varB
 call addvar varA varB
 popstk varA
 prntint varA
+call recurse #400
+popstk @eax
+prntint @eax
 halt
