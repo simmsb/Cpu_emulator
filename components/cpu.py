@@ -1,6 +1,5 @@
-from .opcodes import *
 from .memory import *
-
+from .opcodes import *
 
 DEBUG = False
 
@@ -24,7 +23,8 @@ class Registers:
             "eax": 0,  # general purpose
             "ret": 0,  # function return to
             "stk": memory_size,  # current stack position, start at last memory position
-            "cmp": '00000'  # last comparison [less, more, less equal, more equal equal]
+            # last comparison [less, more, less equal, more equal equal]
+            "cmp": '00000'
         }
 
     def __getitem__(self, key):
@@ -84,7 +84,8 @@ class Cpu:
             raise e  # re-raise here so we can ignore it
         except Exception as e:
             print("Computer crashed!")
-            print("Last instruction was: {}".format(self.instruction_set.encoded_commands[opcode].__name__))
+            print("Last instruction was: {}".format(
+                self.instruction_set.encoded_commands[opcode].__name__))
             print("operands were: {}".format(operands))
             print("exception was: {}".format(e))
             raise CpuStoppedCall("Computer Crashed Halt")
@@ -97,7 +98,7 @@ class Cpu:
 
         def interpret_memory_location(location_string):
             return self.registers[location_string.lstrip("@")] if location_string.startswith("@") else \
-                                                                        self.memory[int(location_string)]
+                self.memory[int(location_string)]
 
         return int(string.lstrip("#")) if string.startswith("#") else interpret_memory_location(string)
 
@@ -130,7 +131,7 @@ class Compiler:
 
     def __init__(self, program_string, memory_size):
         self.program = [i for i in program_string.split('\n')] if \
-                isinstance(program_string, str) else program_string
+            isinstance(program_string, str) else program_string
         # allow both string of commands and list of commands
         self.instruction_set = InstructionSet()
         self.memory_size = memory_size
@@ -152,9 +153,11 @@ class Compiler:
             returns None if line ended up being empty"""
             return line.split(";")[0].rstrip() or None
 
-        temporary_commands = list(filter(None, map(_comment_empty_filter, commands)))
+        temporary_commands = list(
+            filter(None, map(_comment_empty_filter, commands)))
         label_commands = temporary_commands.copy()
-        for i, c in enumerate(label_commands):  # remove constant variables and empty lines
+        # remove constant variables and empty lines
+        for i, c in enumerate(label_commands):
             split = c.split()
             op = split[0]
 
@@ -180,7 +183,8 @@ class Compiler:
             if self.instruction_set.encode_name(op):  # is a command
                 temp = i
                 for k, j in labels.items():
-                    temp = self._replace_with_spaces(temp, k, str(program_length + j))
+                    temp = self._replace_with_spaces(
+                        temp, k, str(program_length + j))
                 for k, j in named_jumps.items():
                     temp = self._replace_with_spaces(temp, k, j)
                 return_commands.append(temp)
@@ -188,7 +192,8 @@ class Compiler:
                 # if it is a number, keep it anyway
                 return_commands.append(int(op))
         for i in label_values:
-            return_commands.append(i)  # add initialised variable to end of program
+            # add initialised variable to end of program
+            return_commands.append(i)
         return return_commands
 
     def _compile_command(self, command_str):

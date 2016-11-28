@@ -1,6 +1,7 @@
-from components import *
 import glob
 import os
+
+from components import *
 
 MEMORY_SIZE = 500
 
