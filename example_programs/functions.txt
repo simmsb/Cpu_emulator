@@ -16,9 +16,10 @@ prntint @eax
 halt
 
 _addvar nop
-popstk @acc
-popstk @eax
-add @eax
+mov [@stk+1] @acc
+add [@stk+2]
+pop
+pop
 ret @acc
 
 _recurse nop
