@@ -1,0 +1,43 @@
+call main
+halt
+
+
+_main nop
+pushstk #0
+pushstk #0
+
+input [@stk+#1]
+input [@stk+#2]
+
+call somefunc [@stk+#1] [@stk+2]
+; we return with our variable on the bottom of the stack
+prntint [@stk+#1]
+popstk ; pop pop function return left on stack
+popstk ; pop second temp var
+popstk ; pop first temp var
+ret
+
+
+_somefunc nop ; takes 2 arguments, has one temporary variable
+pushstk #5 ; pushes temporary variable onto stack
+
+_somefunc_loop mov nop
+mov [@stk+#2] @acc ; moves second argument into accumulator
+add [@stk+#3] ; adds first input var to accumulator
+mov @acc [@stk+#2] ; move value stored in @acc to second argument position
+mov [@stk+#1] @acc ; move temporary variable into accumulator
+sub #1
+cmp @acc ; compare accumulator with 0
+mov @acc [@stk+#1] ; move back into stack
+mje somefunc_loop ; if more than 0, jump to start
+; otherwise
+mov [@stk+#2] @ret ; move second argument into return
+popstk
+popstk
+popstk ; pop all variables
+ret @ret ; return
+
+
+
+
+

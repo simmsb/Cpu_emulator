@@ -209,15 +209,16 @@ class InstructionSet:
 
     @instruction()
     @exception_wrapper
-    def popstk(self, memloc):
+    def popstk(self, memloc=None):
         if self.cpu.registers["stk"] > self.cpu.memory.size:
             return 0  # assume everything above maximum address is 0
-        if memloc.startswith("@"):
-            self.cpu.registers[memloc.lstrip("@")] = self.cpu.memory[
-                self.cpu.registers["stk"]]
-        else:
-            self.cpu.memory[int(memloc)] = self.cpu.memory[
-                self.cpu.registers["stk"]]
+        if not memloc is None:
+            if memloc.startswith("@"):
+                self.cpu.registers[memloc.lstrip("@")] = self.cpu.memory[
+                    self.cpu.registers["stk"]]
+            else:
+                self.cpu.memory[int(memloc)] = self.cpu.memory[
+                    self.cpu.registers["stk"]]
         self.cpu.registers["stk"] += 1  # stack descends upwardas
 
     @instruction()
@@ -250,11 +251,8 @@ class InstructionSet:
 
     @instruction()
     @exception_wrapper
-    def ret(self, *args):
-        #print("returning with args: {}".format(args))
+    def ret(self):
         ret_loc = self._pop_stk_py()
-        for i in args:
-            self.pushstk(i)
         self._internal_jump(ret_loc)
 
     @instruction()
