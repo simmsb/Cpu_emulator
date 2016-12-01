@@ -1,3 +1,5 @@
+import re
+
 from .memory import *
 from .opcodes import *
 
@@ -96,11 +98,31 @@ class Cpu:
         3 for memory_location"""
         string = str(string)
 
+        in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")  # allow for in-place addition/ subtraction
+        function_match = re.compile("(?![^+-])[+=](?=[^+-])")
+
+        function_map = {
+            "+":(lambda a, b:interpret(a)+interpret(b)),
+            "-":(lambda a, b:interpret(a)-interpret(b))
+        }
+
         def interpret_memory_location(location_string):
             return self.registers[location_string.lstrip("@")] if location_string.startswith("@") else \
                 self.memory[int(location_string)]
 
-        return int(string.lstrip("#")) if string.startswith("#") else interpret_memory_location(string)
+        def interpret(location_string):
+            return int(location_string.lstrip("#")) if location_string.startswith("#") else interpret_memory_location(location_string)
+
+        multiples = in_place_add.search(string)
+        if multiples:
+            return function_map[function_match.search(multiples.group()).group()](*re.split(r"[+=]", multiples.group()))
+        else:
+            return interpret(string)
+
+
+
+
+
 
     def execute(self):
         while True:
@@ -146,7 +168,6 @@ class Compiler:
         labels = dict()
         named_jumps = dict()
         label_values = list()
-        counter = 0
 
         def _comment_empty_filter(line):
             """Remove comments and empty lines
@@ -162,10 +183,9 @@ class Compiler:
             op = split[0]
 
             if not self.instruction_set.encode_name(op) and not op.startswith("_"):
-                labels[op] = counter
+                labels[op] = len(labels)  # next value is always
                 label_values.append(int(split[1]) if len(split) > 1 else 0)
                 temporary_commands.remove(c)  # cut from list
-                counter += 1
 
         for i, c in enumerate(temporary_commands):  # generate jumps
             split = c.split()
@@ -201,8 +221,8 @@ class Compiler:
             return command_str  # if just a number, keep it
         keys = command_str.split()
         command = self.instruction_set.encode_name(keys[0])
-        operstring = ' '.join(keys[1:])
         if command:  # command exists
+            operstring = ' '.join(keys[1:])
             operands = ''.join([str(ord(k)).zfill(8) for k in operstring])
             return int(str(command) + operands)
         else:
