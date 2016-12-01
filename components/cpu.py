@@ -80,6 +80,7 @@ class Cpu:
             operands = ''.join([chr(int(i)) for i in split_codes]).split()
             if DEBUG:
                 print("Opcode was: {}".format(opcode))
+                print("CMP is {}".format(self.registers["cmp"]))
                 print("Operands were: {}".format(operands))
             self.instruction_set.run_encoded(opcode, *operands)
         except CpuStoppedCall as e:
@@ -92,18 +93,41 @@ class Cpu:
             print("exception was: {}".format(e))
             raise CpuStoppedCall("Computer Crashed Halt")
 
-    def interpret_address(self, string):
-        """#3 for immediate
-        @reg for register
-        3 for memory_location"""
-        string = str(string)
+    def interpret_write_address(self, string):
+        if not isinstance(string, str):
+            raise ValueError("{} supplied to interpret_read_address".format(type(str)))\
 
         in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")  # allow for in-place addition/ subtraction
         function_match = re.compile("(?![^+-])[+=](?=[^+-])")
 
         function_map = {
-            "+":(lambda a, b:interpret(a)+interpret(b)),
-            "-":(lambda a, b:interpret(a)-interpret(b))
+            "+": (lambda a, b: interpret_memory_location(a) + int(b)),
+            "-": (lambda a, b: interpret_memory_location(a) - int(b))
+        }
+
+        def interpret_memory_location(location_string):
+            return self.registers[location_string.lstrip("@")] if location_string.startswith("@") else \
+                self.memory[int(location_string)]
+
+        multiples = in_place_add.search(string)
+        if multiples:
+            return function_map[function_match.search(multiples.group()).group()](*re.split(r"[+=]", multiples.group()))
+        else:
+            return int(string)
+
+    def interpret_read_address(self, string):
+        """#3 for immediate
+        @reg for register
+        3 for memory_location"""
+        if not isinstance(string, str):
+            raise ValueError("{} supplied to interpret_read_address".format(type(str)))
+
+        in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")  # allow for in-place addition/ subtraction
+        function_match = re.compile("(?![^+-])[+=](?=[^+-])")
+
+        function_map = {
+            "+":(lambda a, b: interpret(a)+int(b)),
+            "-":(lambda a, b: interpret(a)-int(b))
         }
 
         def interpret_memory_location(location_string):
@@ -111,23 +135,20 @@ class Cpu:
                 self.memory[int(location_string)]
 
         def interpret(location_string):
-            return int(location_string.lstrip("#")) if location_string.startswith("#") else interpret_memory_location(location_string)
+            return int(location_string.lstrip("#")) if location_string.startswith("#") else \
+                interpret_memory_location(location_string)
 
         multiples = in_place_add.search(string)
         if multiples:
-            return function_map[function_match.search(multiples.group()).group()](*re.split(r"[+=]", multiples.group()))
+            return self.memory[function_map[function_match.search(multiples.group()).group()](*re.split(r"[+=]", multiples.group()))]
         else:
             return interpret(string)
-
-
-
-
-
 
     def execute(self):
         while True:
             try:
                 current_instruction = self.memory[self.registers["cur"]]
+                print("cur is: {}".format(self.registers["cur"]))
                 self.registers["cur"] += 1  # increment counter
                 self._decode_numeric_command(current_instruction)
             except CpuStoppedCall as e:

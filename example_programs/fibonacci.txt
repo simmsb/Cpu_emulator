@@ -4,7 +4,6 @@ current 0
 maxiter 0
 input maxiter
 _loopstart cmp maxiter
-prntint maxiter
 leje end
 mov lastv1 @acc
 add lastv2

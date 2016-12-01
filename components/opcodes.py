@@ -4,12 +4,13 @@ class CpuStoppedCall(Exception):
 instruction_map = {}
 instruction_names = {}
 
+DEBUG = False
 
-def instruction():
+def instruction(alt=None):
     def decorator(func):
         number = 110 + len(instruction_map)
         instruction_map[number] = func
-        instruction_names[func.__name__] = number
+        instruction_names[alt or func.__name__] = number
         return func
     return decorator
 
@@ -17,13 +18,15 @@ def instruction():
 def exception_wrapper(func):
     def decorator(*args):
         try:
+            if DEBUG:
+                print("OPcode: {.__name__}".format(func))
             return func(*args)
-        except TypeError:
+        except TypeError as e:
             raise Exception("Instruction received invalid amount of arguments",
-                            "expected {}, recieved {}".format(func.__code__.co_argcount, len(args)))
-        except ValueError:  # we assume a value error is caused by attempting to treat an absolute value as a mutable object
+                            "expected {}, recieved {}".format(func.__code__.co_argcount, len(args)), e)
+        except ValueError as e:  # we assume a value error is caused by attempting to treat an absolute value as a mutable object
             raise Exception(
-                "Attempt to use absolute value (#) as mutable type")
+                "Attempt to use absolute value (#) as mutable type", e)
     decorator.__name__ = func.__name__
     decorator.__doc__ = func.__doc__
     return decorator
@@ -74,43 +77,43 @@ class InstructionSet:
     @instruction()
     @exception_wrapper
     def add(self, value):
-        self.cpu.registers["acc"] += self.cpu.interpret_address(value)
+        self.cpu.registers["acc"] += self.cpu.interpret_read_address(value)
 
     @instruction()
     @exception_wrapper
     def sub(self, value):
-        self.cpu.registers["acc"] -= self.cpu.interpret_address(value)
+        self.cpu.registers["acc"] -= self.cpu.interpret_read_address(value)
 
     @instruction()
     @exception_wrapper
     def mul(self, value):
-        self.cpu.registers["acc"] *= self.cpu.interpret_address(value)
+        self.cpu.registers["acc"] *= self.cpu.interpret_read_address(value)
 
     @instruction()
     @exception_wrapper
     def div(self, value):
-        self.cpu.registers["acc"] /= self.cpu.interpret_address(value)
+        self.cpu.registers["acc"] /= self.cpu.interpret_read_address(value)
 
     @instruction()
     @exception_wrapper
     def set(self, value):
-        self.cpu.registers["acc"] = self.cpu.interpret_address(value)
+        self.cpu.registers["acc"] = self.cpu.interpret_read_address(value)
 
     @instruction()
     @exception_wrapper
     def mov(self, from_loc, to_loc):
         if to_loc.startswith("@"):
             self.cpu.registers[to_loc.lstrip(
-                "@")] = self.cpu.interpret_address(from_loc)
+                "@")] = self.cpu.interpret_read_address(from_loc)
         else:
-            self.cpu.memory[int(to_loc)] = self.cpu.interpret_address(from_loc)
+            self.cpu.memory[self.cpu.interpret_write_address(to_loc)] = self.cpu.interpret_read_address(from_loc)
 
     @instruction()
     @exception_wrapper
     def cmp(self, a, b=0):
-        av = self.cpu.interpret_address(a)
+        av = self.cpu.interpret_read_address(a)
         # print("comp interpreted as {}".format(av))
-        bv = self.cpu.interpret_address(b) if b else 0
+        bv = self.cpu.interpret_read_address(b) if b else 0
 
         functions = [
             (lambda a, b: a < b),
@@ -129,7 +132,7 @@ class InstructionSet:
     @instruction()
     @exception_wrapper
     def jump(self, jump):
-        self._internal_jump(self.cpu.interpret_address(jump))
+        self._internal_jump(self.cpu.interpret_read_address(jump))
 
     @instruction()
     @exception_wrapper
@@ -169,26 +172,26 @@ class InstructionSet:
     @instruction()
     @exception_wrapper
     def prntint(self, memloc):
-        print(self.cpu.interpret_address(memloc))
+        print(self.cpu.interpret_read_address(memloc))
 
     @instruction()
     @exception_wrapper
     def prntstr(self, memloc):
-        print(chr(self.cpu.interpret_address(memloc)), end='')
+        print(chr(self.cpu.interpret_read_address(memloc)), end='')
 
     @instruction()
     @exception_wrapper
     def prntnl(self):
         print("\n")
 
-    @instruction()
+    @instruction(alt="input")
     @exception_wrapper
-    def input(self, memloc):
+    def inp(self, memloc):
         if memloc.startswith("@"):
             self.cpu.registers[memloc.strip("@").lower()] = int(
                 input("Enter number: "))
         else:
-            self.cpu.memory[int(memloc)] = int(input("Enter number: "))
+            self.cpu.memory[self.cpu.interpret_write_address(memloc)] = int(input("Enter number: "))
 
       # like anything wrong could happen here
     @instruction()
@@ -202,10 +205,10 @@ class InstructionSet:
         # move from location stored in location to location
         if to_loc.startswith("@"):
             self.cpu.registers[to_loc.lstrip("@")] = self.cpu.memory[
-                self.cpu.interpret_address(from_loc)]
+                self.cpu.interpret_read_address(from_loc)]
         else:
-            self.cpu.memory[int(to_loc)] = self.cpu.memory[
-                self.cpu.interpret_address(from_loc)]
+            self.cpu.memory[self.cpu.interpret_write_address(to_loc)] = self.cpu.memory[
+                self.cpu.interpret_read_address(from_loc)]
 
     @instruction()
     @exception_wrapper
@@ -217,7 +220,7 @@ class InstructionSet:
                 self.cpu.registers[memloc.lstrip("@")] = self.cpu.memory[
                     self.cpu.registers["stk"]]
             else:
-                self.cpu.memory[int(memloc)] = self.cpu.memory[
+                self.cpu.memory[self.cpu.interpret_write_address(memloc)] = self.cpu.memory[
                     self.cpu.registers["stk"]]
         self.cpu.registers["stk"] += 1  # stack descends upwardas
 
@@ -227,11 +230,7 @@ class InstructionSet:
         # decrement first since last push will leave us one below
         self.cpu.registers["stk"] -= 1
         self.cpu.memory[self.cpu.registers["stk"]
-                        ] = self.cpu.interpret_address(value)
-
-    def _push_stk_py(self, value):
-        self.cpu.registers["stk"] -= 1
-        self.cpu.memory[self.cpu.registers["stk"]] = value
+                        ] = self.cpu.interpret_read_address(value)
 
     @instruction()
     @exception_wrapper
@@ -242,6 +241,10 @@ class InstructionSet:
             self.pushstk(i)  # push vars to stack
         self.jump(function_location)
 
+    def _push_stk_py(self, value):
+        self.cpu.registers["stk"] -= 1
+        self.cpu.memory[self.cpu.registers["stk"]] = value
+
     def _pop_stk_py(self):
         if self.cpu.registers["stk"] > self.cpu.memory.size:
             return 0
@@ -251,8 +254,10 @@ class InstructionSet:
 
     @instruction()
     @exception_wrapper
-    def ret(self):
+    def ret(self, retval=None):
         ret_loc = self._pop_stk_py()
+        if retval is not None:
+            self._push_stk_py(self.cpu.interpret_read_address(retval))
         self._internal_jump(ret_loc)
 
     @instruction()

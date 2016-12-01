@@ -39,7 +39,7 @@ You should always use jump labels instead of absolute references, as the index o
 
 Comments start with ```;```, there are no multi line comments, only lines starting with ```;``` only. whitespace between the last operand and the comment is sorted for you.
 
-In place addition/ subtraction is done with ```[arg1+arg2]```. Currently labels are not supported because of how the preprocessor handles the conversion to memory addresses (I'll fix this soon)
+In place addition/ subtraction is done with ```[arg1+offset]```, for example: ```[@stk+1]```. Currently labels are not supported because of how the preprocessor handles the conversion to memory addresses (I'll fix this soon)
 
 Because of this stack scope can be used (Ideally you should use the stack entirely now, eliminating the need for globals)
 
