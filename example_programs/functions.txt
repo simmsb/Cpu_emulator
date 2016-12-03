@@ -20,7 +20,8 @@ mov [@stk+1] @acc
 add [@stk+2]
 pop
 pop
-ret @acc
+mov @acc @ret
+ret
 
 _recurse nop
 
@@ -33,4 +34,5 @@ call recurse @acc  ; otherwise call self again
 
 popstk @eax ; pop what is returned from function when it starts the return chain
 prntint @eax ; print what is returned
-_recreturn ret @acc
+mov @acc @ret ;move accumulator into return register
+_recreturn ret

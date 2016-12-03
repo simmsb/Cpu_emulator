@@ -11,8 +11,7 @@ input [@stk+1]
 
 call somefunc [@stk+0] [@stk+1]
 ; we return with our variable on the bottom of the stack
-prntint [@stk+0]
-popstk ; pop recieved variable
+prntint @ret
 popstk ; pop second temp var
 popstk ; pop first temp var
 ret
@@ -34,7 +33,7 @@ mje somefunc_loop ; if more than 0, jump to start
 mov [@stk+0] @ret ; move second argument into return
 popstk
 popstk
-ret @ret; return
+ret; return
 
 
 

@@ -14,7 +14,7 @@ In place integers start with `#` and are followed by the number, ie: `#5`.
 
 Memory addresses are accessed with a plain integer, like `5` (this points to memory address 5). Note that you should index memory addresses starting from 1, as there is always a unconditional jump to the start (and also remember that all variables are moved to the start of the program). You could also just use a variable instead, like `varFive` and just reuse it as needed.
 
-Registers start with `@` and are accessed with their name directly. The list of registers are:
+Registers start with `@` and are accessed with their name directly (for example: `@acc`). The list of registers are:
 
 ```
 CUR  < current instruction register (no reason to access directly use jump command to modify).
@@ -26,7 +26,7 @@ CMP  < last comparison register. (unlike the others, this contains a string, don
 STK  < current stack position (leave it for popstk and pushstk to handle)
 ```
 
-Variables are assigned as any non-command word followed by a initial value (if none provided, it is set to 0) for example `myVariable 5`, this can be accessed again at any time with `myVariable`. Note that the way the program is compiled, all instances of the varible name are replaced with it's assigned memory location, so you can't do `#myVariable` to get to a memory location contained in a memory location, instead you should use the command `fromloc <from> <to>` which will retrieve the contents of the memory location stored at a loction. Note that all variables are removed from the command list and placed at the end of the program, because of this you should not mix use of absolute location memory references and labels, as the index of a location could change depending on whether it was in front of or behind a label. Also, variables have no scope, they are always global, use the stack if you want to have semi scoped function variables
+Variables are assigned as any non-command word followed by a initial value (if none provided, it is set to 0) for example `myVariable 5`, this can be accessed again at any time with `myVariable`. Note that the way the program is compiled, all instances of the varible name are replaced with it's assigned memory location, so you can't do `#myVariable` to get to a memory location contained in a memory location, instead you should use the command `movloc <from> <to>` which will move the contents of the memory location stored at the from location to the position at <to>. Note that all variables are removed from the command list and placed at the end of the program, because of this you should not mix use of absolute location memory references and labels, as the index of a location could change depending on whether it was in front of or behind a label. Also, variables have no scope, they are always global, use the stack if you want to have semi scoped function variables
 
 Jump labels are assigned as any word starting with the character `_`, and should be referenced with the name without the `_` an example of a jump label would be: `_myJump`. Jump definitions should always precede a command (for example: `_myJump mov @acc myVar` You would then jump to that location with `jump myVar` You should always use jump labels instead of absolute references, as the index of a command/ function can change depending on where you defined variables
 
@@ -35,6 +35,8 @@ Comments start with `;`, there are no multi line comments, only lines starting w
 In place addition/ subtraction is done with `[arg1+offset]`, for example: `[@stk+1]`. Currently labels are not supported because of how the preprocessor handles the conversion to memory addresses ( you can just load the label into a register then use it)
 
 Because of this stack scope can be used (Ideally you should use the stack entirely now, eliminating the need for globals)
+
+Functions are just jump labels, but the call instruction will automatically place the return address and any variables to call it with onto the stack, you should handle all stack variables inside the function. To return from a function, you must place the return data (if any) into the `@ret` register, pop all the variables given to the function, and any you have added, then call the `ret` instruction. 
 
 # Okay, Time for the command list
 
