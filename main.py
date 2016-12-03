@@ -17,7 +17,8 @@ for i, c in enumerate(files):
 
 while True:
     program = filedict.get(input("Index of program to run: "))
-    if program: break
+    if program:
+        break
 
 
 with open(program) as commandList:

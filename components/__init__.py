@@ -1,7 +1,7 @@
-"""Python CPU emulator
+"""
+Python CPU emulator
 
-opcodes:
-    Todo: fill out opcodes
+Todo: Think of some stuff to add
 """
 
 from .cpu import *

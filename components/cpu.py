@@ -97,9 +97,11 @@ class Cpu:
 
     def interpret_write_address(self, string):
         if not isinstance(string, str):
-            raise ValueError("{} supplied to interpret_write_address".format(string))
+            raise ValueError(
+                "{} supplied to interpret_write_address".format(string))
 
-        in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")  # allow for in-place addition/ subtraction
+        # allow for in-place addition/ subtraction
+        in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")
         function_match = re.compile("(?![^+-])[+=](?=[^+-])")
 
         function_map = {
@@ -122,14 +124,16 @@ class Cpu:
         @reg for register
         3 for memory_location"""
         if not isinstance(string, str):
-            raise ValueError("{} supplied to interpret_read_address".format(string))
+            raise ValueError(
+                "{} supplied to interpret_read_address".format(string))
 
-        in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")  # allow for in-place addition/ subtraction
+        # allow for in-place addition/ subtraction
+        in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")
         function_match = re.compile("(?![^+-])[+=](?=[^+-])")
 
         function_map = {
-            "+": (lambda a, b: interpret(a)+int(b)),
-            "-": (lambda a, b: interpret(a)-int(b))
+            "+": (lambda a, b: interpret(a) + int(b)),
+            "-": (lambda a, b: interpret(a) - int(b))
         }
 
         def interpret_memory_location(location_string):

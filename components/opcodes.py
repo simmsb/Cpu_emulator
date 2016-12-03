@@ -6,6 +6,7 @@ instruction_names = {}
 
 DEBUG = False
 
+
 def instruction(alt=None):
     def decorator(func):
         number = 110 + len(instruction_map)
@@ -26,7 +27,7 @@ def exception_wrapper(func):
                             "expected {}, recieved {}".format(func.__code__.co_argcount, len(args)), e)
         except ValueError as e:  # we assume a value error is caused by attempting to treat an absolute value as a mutable object
             raise Exception(
-                "Attempt to use absolute value (#) as mutable type", e)
+                "Possible attempt to use absolute value (#) as mutable type", e)
     decorator.__name__ = func.__name__
     decorator.__doc__ = func.__doc__
     return decorator
@@ -106,7 +107,8 @@ class InstructionSet:
             self.cpu.registers[to_loc.lstrip(
                 "@")] = self.cpu.interpret_read_address(from_loc)
         else:
-            self.cpu.memory[self.cpu.interpret_write_address(to_loc)] = self.cpu.interpret_read_address(from_loc)
+            self.cpu.memory[self.cpu.interpret_write_address(
+                to_loc)] = self.cpu.interpret_read_address(from_loc)
 
     @instruction()
     @exception_wrapper
@@ -191,7 +193,8 @@ class InstructionSet:
             self.cpu.registers[memloc.strip("@").lower()] = int(
                 input("Enter number: "))
         else:
-            self.cpu.memory[self.cpu.interpret_write_address(memloc)] = int(input("Enter number: "))
+            self.cpu.memory[self.cpu.interpret_write_address(
+                memloc)] = int(input("Enter number: "))
 
       # like anything wrong could happen here
     @instruction()
