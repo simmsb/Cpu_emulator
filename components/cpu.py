@@ -79,9 +79,11 @@ class Cpu:
             split_codes = self._split_every(str(value)[3:], 8)
             operands = ''.join([chr(int(i)) for i in split_codes]).split()
             if DEBUG:
+                print(self.registers.registers)
                 print("Opcode was: {}".format(opcode))
                 print("CMP is {}".format(self.registers["cmp"]))
                 print("Operands were: {}".format(operands))
+                print("Memory is: {}".format(self.memory.cells))
             self.instruction_set.run_encoded(opcode, *operands)
         except CpuStoppedCall as e:
             raise e  # re-raise here so we can ignore it
@@ -95,7 +97,7 @@ class Cpu:
 
     def interpret_write_address(self, string):
         if not isinstance(string, str):
-            raise ValueError("{} supplied to interpret_read_address".format(type(str)))\
+            raise ValueError("{} supplied to interpret_write_address".format(string))
 
         in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")  # allow for in-place addition/ subtraction
         function_match = re.compile("(?![^+-])[+=](?=[^+-])")
@@ -120,14 +122,14 @@ class Cpu:
         @reg for register
         3 for memory_location"""
         if not isinstance(string, str):
-            raise ValueError("{} supplied to interpret_read_address".format(type(str)))
+            raise ValueError("{} supplied to interpret_read_address".format(string))
 
         in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")  # allow for in-place addition/ subtraction
         function_match = re.compile("(?![^+-])[+=](?=[^+-])")
 
         function_map = {
-            "+":(lambda a, b: interpret(a)+int(b)),
-            "-":(lambda a, b: interpret(a)-int(b))
+            "+": (lambda a, b: interpret(a)+int(b)),
+            "-": (lambda a, b: interpret(a)-int(b))
         }
 
         def interpret_memory_location(location_string):
@@ -148,7 +150,8 @@ class Cpu:
         while True:
             try:
                 current_instruction = self.memory[self.registers["cur"]]
-                print("cur is: {}".format(self.registers["cur"]))
+                if DEBUG:
+                    print("cur is: {}".format(self.registers["cur"]))
                 self.registers["cur"] += 1  # increment counter
                 self._decode_numeric_command(current_instruction)
             except CpuStoppedCall as e:

@@ -1,3 +1,0 @@
-mov [#5+#6] @acc
-prntint @acc
-halt

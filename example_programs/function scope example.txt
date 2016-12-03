@@ -6,36 +6,34 @@ _main nop
 pushstk #0
 pushstk #0
 
+input [@stk+0]
 input [@stk+1]
-input [@stk+2]
 
-call somefunc [@stk+1] [@stk+2]
+call somefunc [@stk+0] [@stk+1]
 ; we return with our variable on the bottom of the stack
-prntint [@stk+1]
-popstk ; pop pop function return left on stack
+prntint [@stk+0]
+popstk ; pop recieved variable
 popstk ; pop second temp var
 popstk ; pop first temp var
 ret
 
 
 _somefunc nop ; takes 2 arguments, has one temporary variable
-pushstk #5 ; pushes temporary variable onto stack
-
+prntint [@stk+0] ; print first var
+prntint [@stk+1]
 _somefunc_loop nop
-mov [@stk+2] @acc ; moves second argument into accumulator
-add [@stk+3] ; adds first input var to accumulator
-mov @acc [@stk+2] ; move value stored in @acc to second argument position
-mov [@stk+1] @acc ; move temporary variable into accumulator
+mov [@stk+0] @acc ; moves second argument into accumulator
+add @acc ; adds to itself
+mov @acc [@stk+0] ; move value stored in @acc to second argument position
+mov [@stk+1] @acc ; move first variable into accumulator
 sub #1
-prntint @acc
 cmp @acc ; compare accumulator with 0
 mov @acc [@stk+1] ; move back into stack
 mje somefunc_loop ; if more than 0, jump to start
 ; otherwise
-mov [@stk+2] @ret ; move second argument into return
+mov [@stk+0] @ret ; move second argument into return
 popstk
 popstk
-popstk ; pop all variables
 ret @ret; return
 
 

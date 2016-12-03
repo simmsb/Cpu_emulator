@@ -235,10 +235,12 @@ class InstructionSet:
     @instruction()
     @exception_wrapper
     def call(self, function_location, *args):
-        # push return address to stack
+        collected_args = [self.cpu.interpret_read_address(i) for i in args]
+        # since stack position will change once we push return location
         self._push_stk_py(self.cpu.registers["cur"])
-        for i in args:
-            self.pushstk(i)  # push vars to stack
+        # push return address to stack
+        for i in collected_args:
+            self._push_stk_py(i)  # push vars to stack
         self.jump(function_location)
 
     def _push_stk_py(self, value):
