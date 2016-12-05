@@ -174,7 +174,7 @@ class InstructionSet:
     @instruction()
     @exception_wrapper
     def prntint(self, memloc):
-        print(self.cpu.interpret_read_address(memloc))
+        print(self.cpu.interpret_read_address(memloc), end="")
 
     @instruction()
     @exception_wrapper
