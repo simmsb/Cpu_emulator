@@ -136,8 +136,6 @@ class InstructionSet:
     def jump(self, jump):
         self._internal_jump(self.cpu.interpret_read_address(jump))
 
-    @instruction()
-    @exception_wrapper
     def _test_cmp(self, index):
         return int(self.cpu.registers["cmp"][index])
 
@@ -169,6 +167,12 @@ class InstructionSet:
     @exception_wrapper
     def eqje(self, jump):  # equal
         if self._test_cmp(4):
+            self.jump(jump)
+
+    @instruction()
+    @exception_wrapper
+    def nqje(self, jump):  # not equal
+        if self._test_cmp(5):
             self.jump(jump)
 
     @instruction()
