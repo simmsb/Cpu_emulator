@@ -122,7 +122,8 @@ class InstructionSet:
             (lambda a, b: a > b),
             (lambda a, b: a <= b),
             (lambda a, b: a >= b),
-            (lambda a, b: a == b)
+            (lambda a, b: a == b),
+            (lambda a, b: a != b)
         ]
         self.cpu.registers["cmp"] = "".join(
             [str(1 if i(av, bv) else 0) for i in functions])
