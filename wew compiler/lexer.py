@@ -23,13 +23,13 @@ class FuncSolver(SolverBase):
         self.rparen = pp.Literal(")")
 
 
-        self.funcStructure << self.variable + pp.Group(self.lparen + self.args + self.rparen)
+        self.funcStructure << self.variable + pp.Group(self.lparen + pp.Optional(self.args) + self.rparen)
 
-        def parse_line(self, line, lineno):
-            try:
-                return self.expr_def.parseString(line).asList()
-            except Exception as e:
-                raise ParseException("Failed parsing function call line: {}".format(lineno), e)
+    def parse_line(self, line, lineno=0):
+        try:
+            return self.funcStructure.parseString(line).asList()
+        except Exception as e:
+            raise ParseException("Failed parsing function call line: {}".format(lineno), e)
 
 class AssignmentSolver(FuncSolver):
     def __init__(self):
@@ -53,8 +53,22 @@ class AssignmentSolver(FuncSolver):
         self.expr_def = self.assign + self.semicol
 
 
-    def parse_line(self, line, lineno):
+    def parse_line(self, line, lineno=0):
         try:
             return self.expr_def.parseString(line).asList()
         except Exception as e:
             raise ParseException("Failed parsing math line: {}".format(lineno), e)
+
+
+if __name__ == "__main__":
+    a = FuncSolver()
+    b = AssignmentSolver()
+
+    print(a.parse_line("wew()"))
+    print(a.parse_line("wew(lad)"))
+    print(a.parse_line("wew(lad(ayy), ayy)"))
+    print(a.parse_line("wew(lad(ayy(lmao(test))))"))
+    print(a.parse_line("wew(lad(ayy()))"))
+
+    print(b.parse_line("A := A + B - C;"))
+    print(b.parse_line("A := func() + c * 5;"))

@@ -12,6 +12,7 @@ input [@stk+1]
 call somefunc [@stk+0] [@stk+1]
 ; we return with our variable on the bottom of the stack
 prntint @ret
+prntnl
 popstk ; pop second temp var
 popstk ; pop first temp var
 ret
