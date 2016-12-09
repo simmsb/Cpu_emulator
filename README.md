@@ -23,7 +23,8 @@ RAX  < general purpose register (ideally store function returns here)
 EAX  < general purpose register
 RET  < function jump return
 CMP  < last comparison register. (unlike the others, this contains a string, dont touch it and you'll be fine)
-STK  < current stack position (leave it for popstk and pushstk to handle)
+STK  < current stack position
+LSTK < temporary stack position (used for calling functions)
 ```
 
 Variables are assigned as any non-command word followed by a initial value (if none provided, it is set to 0) for example `myVariable 5`, this can be accessed again at any time with `myVariable`. Note that the way the program is compiled, all instances of the varible name are replaced with it's assigned memory location, so you can't do `#myVariable` to get to a memory location contained in a memory location, instead you should use the command `movloc <from> <to>` which will move the contents of the memory location stored at the from location to the position at <to>. Note that all variables are removed from the command list and placed at the end of the program, because of this you should not mix use of absolute location memory references and labels, as the index of a location could change depending on whether it was in front of or behind a label. Also, variables have no scope, they are always global, use the stack if you want to have semi scoped function variables
@@ -36,7 +37,7 @@ In place addition/ subtraction is done with `[arg1+offset]`, for example: `[@stk
 
 Because of this stack scope can be used (Ideally you should use the stack entirely now, eliminating the need for globals)
 
-Functions are just jump labels, but the call instruction will automatically place the return address and any variables to call it with onto the stack, you should handle all stack variables inside the function. To return from a function, you must place the return data (if any) into the `@ret` register, pop all the variables given to the function, and any you have added, then call the `ret` instruction. 
+Functions are just jump labels, but the call instruction will automatically place the return address and any variables to call it with onto the stack, you should handle all stack variables inside the function. To return from a function, you must place the return data (if any) into the `@ret` register, pop all the variables given to the function, and any you have added, then call the `ret` instruction.
 
 # Okay, Time for the command list
 

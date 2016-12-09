@@ -9,9 +9,6 @@ all variables declared at start of functions
 example:
 
 ```
-PROGRAM testProgram
-
-
 FUNCTION main
 VARS
 wew
@@ -26,7 +23,6 @@ ayy = addTWo(wew, lad)
 
 print ayy
 
-END
 ENDFUNCTION
 
 
@@ -35,9 +31,5 @@ BEGIN
 
 RETURN a + b
 
-END
 ENDFUNCTION
-
-
-ENDPROGRAM
 ```

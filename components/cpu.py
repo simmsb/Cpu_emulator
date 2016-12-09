@@ -25,8 +25,9 @@ class Registers:
             "eax": 0,  # general purpose
             "ret": 0,  # function return to
             "stk": memory_size,  # current stack position, start at last memory position
-            # last comparison [less, more, less equal, more equal equal]
-            "cmp": '00000'
+            # last comparison [le, me, leq, meq, eq, neq]
+            "cmp": '000000',
+            "lstk": 0  # local stack pointer
         }
 
     def __getitem__(self, key):

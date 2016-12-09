@@ -6,6 +6,23 @@ class ParseException(Exception):
     pass
 
 
+class mathOP:
+    def __init__(self, op): #, op, b):
+        self.op = op
+
+
+class funcOP:
+    def __init__(self, funcname, params):
+        self.funcname = funcname
+        self.params = params.asList()
+
+class assignOP:
+    def __init__(self, setter, val):
+        self.setter = setter
+        self.val = val
+
+
+
 class SolverBase:
     def __init__(self):
         self.integer = pp.Word(pp.nums).setParseAction(lambda t:int(t[0]))
@@ -18,12 +35,14 @@ class FuncSolver(SolverBase):
         super().__init__()
         self.funcStructure = pp.Forward()
         self.arg = pp.Group(self.funcStructure) | self.operand
-        self.args = self.arg + pp.ZeroOrMore("," + self.arg)  # we force arguments since functions have no side effects
-        self.lparen = pp.Literal("(")
-        self.rparen = pp.Literal(")")
+        self.comma = pp.Literal(",").suppress()
+        self.args = self.arg + pp.ZeroOrMore(self.comma + self.arg)
+        self.lparen = pp.Literal("(").suppress()
+        self.rparen = pp.Literal(")").suppress()
 
 
         self.funcStructure << self.variable + pp.Group(self.lparen + pp.Optional(self.args) + self.rparen)
+        self.funcStructure.setParseAction(lambda s,l,t: funcOP(*t))
 
     def parse_line(self, line, lineno=0):
         try:
@@ -34,7 +53,7 @@ class FuncSolver(SolverBase):
 class AssignmentSolver(FuncSolver):
     def __init__(self):
         super().__init__()
-        self.equals = pp.Literal(":=")
+        self.equals = pp.Literal(":=").suppress()
         self.operator = self.funcStructure | self.operand
 
         self.sign = pp.oneOf("+ -")
@@ -47,10 +66,11 @@ class AssignmentSolver(FuncSolver):
         (self.addsub, 2, pp.opAssoc.RIGHT)
         ]
 
-        self.expr = pp.operatorPrecedence(self.operator, self.oplist)
+        self.expr = pp.operatorPrecedence(self.operator, self.oplist).setParseAction(lambda s,l,t: mathOP(t.asList()))
 
         self.assign = self.variable + self.equals + self.expr
         self.expr_def = self.assign + self.semicol
+        self.expr_def.setParseAction(lambda s,l,t: assignOP(*t))
 
 
     def parse_line(self, line, lineno=0):
@@ -65,6 +85,7 @@ if __name__ == "__main__":
     b = AssignmentSolver()
 
     print(a.parse_line("wew()"))
+    print(a.parse_line("wew(lad, ayy, lmao)"))
     print(a.parse_line("wew(lad)"))
     print(a.parse_line("wew(lad(ayy), ayy)"))
     print(a.parse_line("wew(lad(ayy(lmao(test))))"))

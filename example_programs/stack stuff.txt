@@ -1,0 +1,15 @@
+
+call main #2
+prntint @ret
+prntnl
+halt
+
+_main nop
+mov @stk @lstk
+pushstk @stk
+pushstk #8
+mov [@stk+0] @acc
+add [@lstk+0] ; add from function parameter
+
+popstk @stk ; return stack pointer to as it was
+ret
