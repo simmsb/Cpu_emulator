@@ -50,7 +50,7 @@ SET <@/ #/ Value>  <- sets the accumulator to an absolute value. (as so that you
 MOV <@/ Memory Location (from)> <@/ Memory Location (to)>  <- moves contents of one location to the other.
 CMP <@/ #/ Value> <@/ #/ Value>  <- compares the first with the second, stores in the @CMP register, if second parameter is not provided, compares with 0 instead.
 JUMP <@/ #/ Value>  <- jump to location
-lje, mje, leje, meje, eqje <@/ #/ Value>  <- jump to memory location if last comparison is true for [less than, more than, less than or equal, more than or equal, equal] in that order
+lje, mje, leje, meje, eqje, nqje <@/ #/ Value>  <- jump to memory location if last comparison is true for [less than, more than, less than or equal, more than or equal, equal, not equal] in that order
 prntint <@/ #/ Value>  <- print value to stdout
 PRNTSTR <@/ #/ Value>  <- print value as a character to stdout (note does not print newline character)
 PRNTNL  <- prints a newline on stdout
