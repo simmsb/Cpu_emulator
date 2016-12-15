@@ -13,19 +13,19 @@ class OperatorSet:
 
     @operator('+')
     def add():
-        return 'MOV @stk @acc\nPOPSTK @stk\nADD @stk\nPOPSTK @stk\nPUSHSTK @acc\n'
+        return ['POPSTK @eax','POPSTK @acc','ADD @eax','PUSHSTK @acc']
 
     @operator('-')
     def sub():
-        return 'MOV @stk @acc\nPOPSTK @stk\nSUB @stk\nPOPSTK @stk\nPUSHSTK @acc\n'
+        return ['POPSTK @eax','POPSTK @acc','SUB @eax','PUSHSTK @acc']
 
     @operator('*')
     def mul():
-        return 'MOV @stk @acc\nPOPSTK @stk\nMUL @stk\nPOPSTK @stk\nPUSHSTK @acc\n'
+        return ['POPSTK @eax','POPSTK @acc','MUL @eax','PUSHSTK @acc']
 
     @operator('/')
     def div():
-        return 'MOV @stk @acc\nPOPSTK @stk\nDIV @stk\nPOPSTK @stk\nPUSHSTK @acc\n'
+        return ['POPSTK @eax','POPSTK @acc','DIV @eax','PUSHSTK @acc']
 
 class Parser(OperatorSet):
     def __init__(self, source):
@@ -34,11 +34,11 @@ class Parser(OperatorSet):
         self.compiled = self.compile()
 
     def compile(self):
-        text = ''
+        text = []
         for i in self.source:
             if i.isdigit():
-                text+='PUSHSTK {}\n'.format(i)
+                text.append('PUSHSTK #{}'.format(i))
             elif self.ops.get(i):
-                text+= self.ops.get(i)()
-        text+= 'PRNTINT @stk'
+                text += self.ops.get(i)()
+        text += ['PRNTINT [@stk+0]', 'PRNTNL', 'HALT']
         return text
