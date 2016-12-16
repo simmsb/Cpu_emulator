@@ -181,8 +181,8 @@ class Compiler:
     compiled: returns map object of compiled commands"""
 
     def __init__(self, program_string, memory_size):
-        self.program = [i for i in program_string.split('\n')] if \
-            isinstance(program_string, str) else program_string
+        self.program = [i.lower() for i in program_string.split('\n')] if \
+            isinstance(program_string, str) else [i.lower() for i in program_string]
         # allow both string of commands and list of commands
         self.instruction_set = InstructionSet()
         self.memory_size = memory_size
@@ -193,6 +193,7 @@ class Compiler:
         return " ".join([replace if i == search else i for i in string.split()])
 
     def _pre_process_instructions(self, commands):
+        print(commands)
         return_commands = list()
         labels = dict()
         named_jumps = dict()
@@ -208,7 +209,7 @@ class Compiler:
         label_commands = temporary_commands.copy()
         # remove constant variables and empty lines
         for i, c in enumerate(label_commands):
-            split = c.split()
+            split = c.lower().split()
             op = split[0]
 
             if not self.instruction_set.encode_name(op) and not op.startswith("_"):
