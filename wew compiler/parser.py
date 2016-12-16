@@ -1,3 +1,5 @@
+import pyparsing as pp
+
 import lexer
 
 jump_counter = 0
@@ -69,7 +71,7 @@ class FunctionObject:
         for i in self.code:
             if i.startswith("RETURN"):
                 self.returns.append(
-                    "mov {} @ret\n{}\nret".format(i.split()[-1], ))
+                    "mov {} @ret\n{}\nret".format(i.split()[-1], )) # TODO: fix this
 
     @property
     def parsed_vars(self):
@@ -105,27 +107,11 @@ def parse_function(program_list):
     def except_whitespace(program_list):
         return list(filter(None, map(lambda x: x.strip(), program_list)))
 
-    def parse(program_list):
-        i = 0
-        functions = []
-        while i < len(program_list):
-            print(i)
-            if program_list[i].startswith("FUNCTION"):
-                h = i
-                while True:
-                    h += 1
-                    if program_list[h].startswith("ENDFUNCTION"):
-                        fdata = program_list[i].split()[1:]
-                        functions.append(FunctionObject(
-                            fdata[0], fdata[1:], program_list[i + 1: h]))
-                        i = h
-                        break
-            i += 1
+    
 
-        return functions
-    return parse(except_whitespace(program_list))
+
 
 
 def load_file(fname):
     with open(fname) as file:
-        return file.read().split("\n")
+        return file.read()

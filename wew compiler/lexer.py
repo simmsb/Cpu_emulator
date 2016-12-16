@@ -28,6 +28,25 @@ class assignOP:
         self.val = val
 
 
+class variableOB:
+
+    def __init__(self, name, initial_val):
+        self.name = name
+        self.initial = initial_val
+
+class variableList:
+    
+    def __init__(self, variables):
+        self.vars = variables
+
+
+class programList:
+    def __init__(self, blocks):
+        self.blocks = blocks
+
+ 
+
+
 class SolverBase:
 
     def __init__(self):
@@ -35,6 +54,10 @@ class SolverBase:
         self.variable = pp.Word(pp.alphas + "_", pp.alphanums + "_", exact=0)
         self.operand = self.integer | self.variable
         self.semicol = pp.Literal(";").suppress()
+        self.equals = pp.Literal(":=").suppress()
+
+        self.opening_curly_bracket = self.opening_curly_bracket
+        self.closing_curly_bracket = pp.literal("}").suppress()
 
 
 class FuncSolver(SolverBase):
@@ -52,6 +75,8 @@ class FuncSolver(SolverBase):
             pp.Group(self.lparen + pp.Optional(self.args) + self.rparen)
         self.funcStructure.setParseAction(lambda s, l, t: funcOP(*t))
 
+        self.func_call = self.funcStructure + self.semicol
+
     def parse_line(self, line, lineno=0):
         try:
             return self.funcStructure.parseString(line).asList()
@@ -64,7 +89,6 @@ class AssignmentSolver(FuncSolver):
 
     def __init__(self):
         super().__init__()
-        self.equals = pp.Literal(":=").suppress()
         self.operator = self.funcStructure | self.operand
 
         self.sign = pp.oneOf("+ -")
@@ -81,15 +105,48 @@ class AssignmentSolver(FuncSolver):
             lambda s, l, t: mathOP(t.asList()))
 
         self.assign = self.variable + self.equals + self.expr
-        self.expr_def = self.assign + self.semicol
-        self.expr_def.setParseAction(lambda s, l, t: assignOP(*t))
+        self.assignment_call = self.assign + self.semicol
+        self.assignment_call.setParseAction(lambda s, l, t: assignOP(*t))
 
     def parse_line(self, line, lineno=0):
         try:
-            return self.expr_def.parseString(line).asList()
+            return self.assignment_call.parseString(line).asList()
         except Exception as e:
             raise ParseException(
                 "Failed parsing math line: {}".format(lineno), e)
+
+
+class ProgramObjects(SolverBase):
+    def __init__(self):
+        super().__init__()
+        self.assignment = AssignmentSolver()
+        self.function = FuncSolver()
+
+        self.operation = self.function.func_call | self.assignment.assignment_call
+
+        self.program = pp.word("program").suppress() + self.opening_curly_bracket + pp.OneOrMore(self.operation) + self.closing_curly_bracket
+        self.program.setParseAction(lambda s, l, t: programList(*t))
+
+
+class FunctionParser(SolverBase):
+
+    def __init__(self, code):
+        super().__init__()
+        self.program = ProgramObjects()
+        self.code = code
+
+        self.varline = self.variable + self.equals + self.integer + self.semicol
+        self.varline.setParseAction(lambda s, l, t: variableOB(*t))
+        self.varsblock = pp.word("vars").suppress(
+        ) + self.opening_curly_bracket + pp.OneOrMore(self.varline) + self.closing_curly_bracket
+        self.varsblock.setParseAction(lambda s, l, t: variableList(*t))
+
+        self.startblock = pp.word("func").suppress(
+        ) + self.variable + self.opening_curly_bracket
+
+        self.endblock = self.closing_curly_bracket
+
+        self.function = self.startblock + pp.Optional(self.varsblock) + self.program.program
 
 
 if __name__ == "__main__":

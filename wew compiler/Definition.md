@@ -1,35 +1,61 @@
-Program begins with `PROGRAM <name>` and ends with `ENDPROGRAM`
-Functions begin with `FUNCTION *<params>` and end with `ENDFUNCTION`
-There has to exist a `main` function that accepts no input and returns nothing
-
-no embedded functions inside functions
-
-all variables declared at start of functions
+Follows C like syntax, but modified a bit
 
 example:
 
 ```
-FUNCTION main
-VARS
-wew
-lad
-ayy
-BEGIN
+func main()
+{
+    vars
+    {
+        a := 5;
+        b;
+        c;
+    }
+    program
+    {
+        b := a*4;
+        c := addtwo(b, 1);
+        print(c)
+        return() ; return is a function
+    }
+}
 
-wew = INPUT
-lad = INPUT
 
-ayy = addTWo(wew, lad)
+func addtwo(a, b)
+{
+    program
+    {
+        return(a + b);
+    }
+}
+```
 
-print ayy
+would become:
 
-ENDFUNCTION
+```
+call main  ; program entry point
+halt
 
+_main nop
+pushstk #5
+pushstk #0
+pushstk #0
+mov [@stk+2] @acc
+mul #4
+mov @acc [@stk+1]
+call addtwo [@stk+1] #1
+mov @ret [@stk+0]
+prntint [@stk+0]
+popstk
+popstk
+popstk
+ret
 
-FUNCTION addTwo a b
-BEGIN
-
-RETURN a + b
-
-ENDFUNCTION
+_addtwo nop
+mov [@stk+0] @acc
+add [@stk+1]
+mov @acc @ret
+popstk
+popstk
+ret
 ```
