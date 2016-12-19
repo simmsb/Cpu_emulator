@@ -8,17 +8,15 @@ class ParseException(Exception):
     pass
 
 
+class mathtest:
+    def __init__(self, op):
+        print(op)
+
+
 class mathOP:
 
     def __init__(self, op):  # , op, b):
         self.op = op
-
-
-class funcOP:
-
-    def __init__(self, funcname, params):
-        self.funcname = funcname
-        self.params = params.asList()
 
 
 class assignOP:
@@ -36,14 +34,37 @@ class variableOB:
 
 class variableList:
     
-    def __init__(self, variables):
+    def __init__(self, *variables):
         self.vars = variables
 
 
 class programList:
-    def __init__(self, blocks):
+    def __init__(self, *blocks):
         self.blocks = blocks
 
+
+class syntaxOB:
+    def __init__(self, mytype, *blocks):
+        self.blocks = blocks
+        self.mytype = mytype
+
+class functionCallOB:
+    def __init__(self, *blocks):
+        self.blocks = blocks
+
+class functionDefineOB:
+    def __init__(self, *blocks):
+        self.blocks = blocks
+
+
+class comparisonOB:
+    def __init__(self, *blocks):
+        self.blocks = blocks
+
+
+class funcBase:
+    def __init__(self, *blocks):
+        self.blocks = blocks
  
 
 
@@ -56,47 +77,45 @@ class SolverBase:
         self.semicol = pp.Literal(";").suppress()
         self.equals = pp.Literal(":=").suppress()
 
-        self.opening_curly_bracket = self.opening_curly_bracket
-        self.closing_curly_bracket = pp.literal("}").suppress()
+        self.opening_curly_bracket = pp.Literal("{").suppress()
+        self.closing_curly_bracket = pp.Literal("}").suppress()
+
+        self.lparen = pp.Literal("(").suppress()
+        self.rparen = pp.Literal(")").suppress()
+        self.comma = pp.Literal(",").suppress()
+
+        self.comparison = pp.oneOf("== != > < >= <=")
 
 
-class FuncSolver(SolverBase):
+class FuncCallSolver(SolverBase):
 
     def __init__(self):
         super().__init__()
         self.funcStructure = pp.Forward()
         self.arg = pp.Group(self.funcStructure) | self.operand
-        self.comma = pp.Literal(",").suppress()
         self.args = self.arg + pp.ZeroOrMore(self.comma + self.arg)
-        self.lparen = pp.Literal("(").suppress()
-        self.rparen = pp.Literal(")").suppress()
+
 
         self.funcStructure << self.variable + \
             pp.Group(self.lparen + pp.Optional(self.args) + self.rparen)
-        self.funcStructure.setParseAction(lambda s, l, t: funcOP(*t))
+        self.funcStructure.setParseAction(lambda s, l, t: functionCallOB(*t))
 
         self.func_call = self.funcStructure + self.semicol
 
-    def parse_line(self, line, lineno=0):
-        try:
-            return self.funcStructure.parseString(line).asList()
-        except Exception as e:
-            raise ParseException(
-                "Failed parsing function call line: {}".format(lineno), e)
+    def parse(self, string):
+        return self.funcStructure.parseString(string).asList()
 
 
-class AssignmentSolver(FuncSolver):
+class AssignmentSolver(FuncCallSolver):
 
     def __init__(self):
         super().__init__()
         self.operator = self.funcStructure | self.operand
 
-        self.sign = pp.oneOf("+ -")
         self.addsub = pp.oneOf("+ -")
         self.muldiv = pp.oneOf("* /")
 
         self.oplist = [
-            (self.sign, 1, pp.opAssoc.RIGHT),
             (self.muldiv, 2, pp.opAssoc.RIGHT),
             (self.addsub, 2, pp.opAssoc.RIGHT)
         ]
@@ -108,57 +127,104 @@ class AssignmentSolver(FuncSolver):
         self.assignment_call = self.assign + self.semicol
         self.assignment_call.setParseAction(lambda s, l, t: assignOP(*t))
 
-    def parse_line(self, line, lineno=0):
-        try:
-            return self.assignment_call.parseString(line).asList()
-        except Exception as e:
-            raise ParseException(
-                "Failed parsing math line: {}".format(lineno), e)
+    def parse(self, string):
+        return self.assignment_call.parseString(string).asList()
+       
 
 
-class ProgramObjects(SolverBase):
+
+class SyntaxBlockParser(SolverBase):
+
     def __init__(self):
         super().__init__()
-        self.assignment = AssignmentSolver()
-        self.function = FuncSolver()
+        self.program = AssignmentSolver().assignment_call | FuncCallSolver().func_call
+        self.SyntaxObject = pp.Forward()
+        self.Syntaxblk = pp.OneOrMore(pp.Group(self.SyntaxObject) | self.program)
 
-        self.operation = self.function.func_call | self.assignment.assignment_call
+        self.condition = self.lparen + self.operand + self.comparison + self.operand + self.rparen
+        self.condition.setParseAction(lambda s, l, t: comparisonOB(*t))
 
-        self.program = pp.word("program").suppress() + self.opening_curly_bracket + pp.OneOrMore(self.operation) + self.closing_curly_bracket
+        self.syntaxBlocks = pp.oneOf("while if")
+
+        self.SyntaxObject << self.syntaxBlocks + self.condition + self.opening_curly_bracket + self.Syntaxblk + self.closing_curly_bracket
+        self.SyntaxObject.setParseAction(lambda s,l,t: syntaxOB(*t))
+    
+    def parse(self, string):
+        return self.SyntaxObject.parseString(string).asList()
+
+
+
+class OperationsObjects(SolverBase):
+    def __init__(self):
+        super().__init__()
+        self.SyntaxBlocks = SyntaxBlockParser().SyntaxObject
+        self.assignBlocks = AssignmentSolver().assignment_call
+        self.functionBlocks = FuncCallSolver().func_call
+
+        # TODO: add if statement
+
+        self.operation = self.SyntaxBlocks | self.assignBlocks | self.functionBlocks
+    
+    def parse(self, string):
+        return self.operation.parseString(string).asList()
+
+
+
+class ProgramObjects(OperationsObjects):
+    def __init__(self):
+        super().__init__()
+
+        self.program = pp.Word("program").suppress() + self.opening_curly_bracket + pp.OneOrMore(self.operation) + self.closing_curly_bracket
         self.program.setParseAction(lambda s, l, t: programList(*t))
 
+    def parse(self, string):
+        return self.program.parseString(string).asList()
 
-class FunctionParser(SolverBase):
 
-    def __init__(self, code):
+class FunctionDefineParser(SolverBase):
+
+    def __init__(self):
         super().__init__()
         self.program = ProgramObjects()
-        self.code = code
 
         self.varline = self.variable + self.equals + self.integer + self.semicol
         self.varline.setParseAction(lambda s, l, t: variableOB(*t))
-        self.varsblock = pp.word("vars").suppress(
+        self.varsblock = pp.Word("vars").suppress(
         ) + self.opening_curly_bracket + pp.OneOrMore(self.varline) + self.closing_curly_bracket
         self.varsblock.setParseAction(lambda s, l, t: variableList(*t))
 
-        self.startblock = pp.word("func").suppress(
-        ) + self.variable + self.opening_curly_bracket
 
-        self.endblock = self.closing_curly_bracket
+        self.arg = self.operand
+        self.args = self.arg + pp.ZeroOrMore(self.comma + self.arg)
 
-        self.function = self.startblock + pp.Optional(self.varsblock) + self.program.program
+        self.argblock = self.lparen + pp.Optional(self.args) + self.rparen
+
+        self.startblock = pp.Word("func ").suppress(
+        ) + self.variable + self.argblock + self.opening_curly_bracket
+        self.startblock.setParseAction(lambda s,l,t: funcBase(*t))
+
+        self.function = self.startblock + pp.Optional(self.varsblock) + self.program.program + self.closing_curly_bracket
+        self.function.setParseAction(lambda s,l,t: functionDefineOB(*t))
+
+    def parse(self, string):
+        return self.function.parseString(string).asList()
 
 
 if __name__ == "__main__":
-    a = FuncSolver()
-    b = AssignmentSolver()
+    a = OperationsObjects()
 
-    print(a.parse_line("wew()"))
-    print(a.parse_line("wew(lad, ayy, lmao)"))
-    print(a.parse_line("wew(lad)"))
-    print(a.parse_line("wew(lad(ayy), ayy)"))
-    print(a.parse_line("wew(lad(ayy(lmao(test))))"))
-    print(a.parse_line("wew(lad(ayy()))"))
 
-    print(b.parse_line("A := A + B - C;"))
-    print(b.parse_line("A := func() + c * 5;"))
+    print(a.parse("wew();"))
+    print(a.parse("wew(lad, ayy, lmao);"))
+    print(a.parse("wew(lad);"))
+    print(a.parse("wew(lad(ayy), ayy);"))
+    print(a.parse("wew(lad(ayy(lmao(test))));"))
+    print(a.parse("wew(lad(ayy()));"))
+
+    print(a.parse("A := A + B - C;"))
+    print(a.parse("A := func() + c * 5;"))
+
+    print(a.parse("while(a>b){wew();lad(wew());if(a<b){dothis();}}}"))
+
+    b = FunctionDefineParser()
+    print(b.parse("func wew(a,b,c){vars{a:=2;b:=4;}program{call();}}"))
