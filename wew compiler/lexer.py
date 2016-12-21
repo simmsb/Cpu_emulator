@@ -33,7 +33,7 @@ class languageSyntaxOBbase:
                 "object: {} attempted to gain variable {}, but it has no parent".format(self, VarName))
 
         else:
-            return self.parent.get_variable(VarName)
+            return self.parent.get_variable(VarName)  # this should bubble up to the parent function
 
     def assemble(self, parent):
         return ["nop"]
