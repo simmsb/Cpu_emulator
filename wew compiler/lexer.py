@@ -33,7 +33,8 @@ class languageSyntaxOBbase:
                 "object: {} attempted to gain variable {}, but it has no parent".format(self, VarName))
 
         else:
-            return self.parent.get_variable(VarName)  # this should bubble up to the parent function
+            # this should bubble up to the parent function
+            return self.parent.get_variable(VarName)
 
     def assemble(self, parent):
         return ["nop"]
@@ -41,11 +42,11 @@ class languageSyntaxOBbase:
 
 class mathOP(languageSyntaxOBbase):
 
-    def __init__(self, *blocks):  # , op, b):
+    def __init__(self, *children):  # , op, b):
         super().__init__()
-        self.blocks = blocks
+        self.children = children
 
-    """parse infix expression to postfix, sub in vars"""
+    # """parse infix expression to postfix, sub in vars"""
 
 
 class assignOP(languageSyntaxOBbase):
@@ -55,6 +56,9 @@ class assignOP(languageSyntaxOBbase):
         self.setter = setter
         self.val = val
 
+    def parent_own_children(self):
+        self.parent_children(*self.val)
+
 
 class variableOB(languageSyntaxOBbase):
 
@@ -63,12 +67,8 @@ class variableOB(languageSyntaxOBbase):
         self.name = name
         self.initial = initial_val
 
-
-class variableList(languageSyntaxOBbase):
-
-    def __init__(self, *variables):
-        super().__init__()
-        self.vars = variables
+    def __eq__(self, other):
+        return self.name == other
 
 
 class programList(languageSyntaxOBbase):
@@ -93,13 +93,6 @@ class functionCallOB(languageSyntaxOBbase):
         self.blocks = blocks
 
 
-class functionDefineOB(languageSyntaxOBbase):
-
-    def __init__(self, *blocks):
-        super().__init__()
-        self.blocks = blocks
-
-
 class comparisonOB(languageSyntaxOBbase):
 
     def __init__(self, *blocks):
@@ -107,14 +100,19 @@ class comparisonOB(languageSyntaxOBbase):
         self.blocks = blocks
 
 
-class funcBase(languageSyntaxOBbase):
+class varList:
+    def __init__(self, *vars_):
+        self.vars_ = vars_
 
-    def __init__(self, name, params, *blocks):
+
+class functionDefineOB(languageSyntaxOBbase):
+
+    def __init__(self, name, params, vars_, program):
         super().__init__()
-        self.blocks = blocks
         self.name = name
         self.params = params
-        self.vars = []
+        self.vars_ = vars_
+        self.children = program
 
     def get_variable(self, VarName):
         if not self.parent:
@@ -145,9 +143,9 @@ class funcBase(languageSyntaxOBbase):
 
             '''
             if VarName in self.params:
-                return "[@lstk+{}]".format(self.params[::-1].index(VarName) + 1)
+                return "[@lstk+{}]".format(self.params.vars_[::-1].index(VarName) + 1)
             elif VarName in self.vars:
-                return "[@lstk-{}]".format(self.vars.index(VarName) + 1)
+                return "[@lstk-{}]".format(self.vars_.vars_index(VarName) + 1)
             else:
                 raise ParseException(
                     "Attempt to access variable not in scope. Current function: {}, variable: {}".format(self.name, VarName))
@@ -193,12 +191,12 @@ class FuncCallSolver(SolverBase):
     def in_op(self):
         """something := func()
         func(func2());"""
-        return self.FuncCall
+        return self.funcStructure
 
     @property
     def inline(self):
         """func();"""
-        return self.funcStructure
+        return self.FuncCall
 
 
 class AssignmentSolver(FuncCallSolver):
@@ -299,19 +297,28 @@ class FunctionDefineParser(SolverBase):
         super().__init__()
         program = ProgramObjects().parseObject
 
-        varline = self.variable + self.equals + self.integer + self.semicol
-        varline.setParseAction(lambda s, l, t: variableOB(*t))
+        var_assign_line = self.variable + self.equals + self.integer + self.semicol
+        var_assign_line.setParseAction(lambda s, l, t: variableOB(*t))
+        var_noassign_line = self.variable + self.semicol
+        var_noassign_line.setParseAction(
+            lambda s, l, t: variableOB(*t, 0))  # init with 0
+        varline = var_assign_line | var_noassign_line
         varsblock = pp.Word("vars").suppress(
         ) + self.opening_curly_bracket + pp.OneOrMore(varline) + self.closing_curly_bracket
-        varsblock.setParseAction(lambda s, l, t: variableList(*t))
+        varsblock.setParseAction(lambda s, l, t: varList(*t))
 
-        args = self.operand + pp.ZeroOrMore(self.comma + self.operand)
+        arg = self.variable
+        arg.setParseAction(lambda s, l, t: variableOB(*t, 0))
+
+        args = self.variable + pp.ZeroOrMore(self.comma + self.variable)
 
         argblock = self.lparen + pp.Optional(args) + self.rparen
+        argblock.setParseAction(lambda s, l, t: varList(*t))
+
+
 
         startblock = pp.Word("func ").suppress(
         ) + self.variable + argblock + self.opening_curly_bracket
-        startblock.setParseAction(lambda s, l, t: funcBase(*t))
 
         self.function = startblock + \
             pp.Optional(varsblock) + program + self.closing_curly_bracket
@@ -328,7 +335,14 @@ class FunctionDefineParser(SolverBase):
 class ProgramSolver:
 
     def __init__(self):
-        self.functions = FunctionDefineParser().function
+        self.functions = pp.OneOrMore(FunctionDefineParser().function)
+
+    def parse(self, string):
+        return self.functions.parseString(string).asList()
+
+    @property
+    def parseObject(self):
+        return self.functions
 
 
 if __name__ == "__main__":
@@ -348,3 +362,6 @@ if __name__ == "__main__":
 
     b = FunctionDefineParser()
     print(b.parse("func wew(a,b,c){vars{a:=2;b:=4;}program{call();}}"))
+
+    c = ProgramSolver()
+    print(c.parse("func main(wew, lad){vars{wew;}program{callthis();wew:=3;}}"))
