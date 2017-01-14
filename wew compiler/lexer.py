@@ -1,5 +1,7 @@
 import pyparsing as pp
+import copy
 
+from formatter import format_string
 
 # generates math trees, etc
 
@@ -12,16 +14,20 @@ class languageSyntaxOBbase:
 
     def __init__(self):
         self.parent = None
-        self.children = []
+        self.children = [None]
 
     def parent_own_children(self):
-        self.parent_children(*self.children)
+        self.parent_children(*[self.children])
 
     def parent_children(self, *children):
         for i in children:
+            print(i)
             if isinstance(i, languageSyntaxOBbase):
                 i.set_parent(self)
-            elif isinstance(i, list):
+                print("set parent")
+                i.parent_own_children()
+                print("called own children")
+            elif isinstance(i, (list, tuple)):
                 self.parent_children(*i)
 
     def set_parent(self, parent):
@@ -36,8 +42,11 @@ class languageSyntaxOBbase:
             # this should bubble up to the parent function
             return self.parent.get_variable(VarName)
 
-    def assemble(self, parent):
+    def assemble(self):
         return ["nop"]
+
+    def __str__(self):
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <children: {1}>>".format(self, ", ".join("{}".format(str(i)) for i in self.children))
 
 
 class mathOP(languageSyntaxOBbase):
@@ -46,7 +55,15 @@ class mathOP(languageSyntaxOBbase):
         super().__init__()
         self.children = children
 
-    # """parse infix expression to postfix, sub in vars"""
+    def __str__(self):
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <children: {1}>>".format(self, ", ".join("{}".format(str(i)) for i in self.children))
+
+    def assemble(self):
+        """
+        Use stack, infix -> postfix -> stack machine -> return variable in @RET
+        """
+        return ["nop"]  # TODO: This pls
+
 
 
 class assignOP(languageSyntaxOBbase):
@@ -56,9 +73,17 @@ class assignOP(languageSyntaxOBbase):
         self.setter = setter
         self.val = val
 
-    def parent_own_children(self):
-        self.parent_children(*self.val)
+        self.children = [val]
 
+
+    def __str__(self):
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <setter: {0.setter}> <val: {0.val}>>".format(self)
+
+    def assemble(self):
+        variable = self.get_variable(self.setter)
+        value = self.val.assemble()
+
+        return ["mov @ret {}".format(variable)]
 
 class variableOB(languageSyntaxOBbase):
 
@@ -67,52 +92,110 @@ class variableOB(languageSyntaxOBbase):
         self.name = name
         self.initial = initial_val
 
+
+    def __str__(self):
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.name}> <initial: {0.initial}>>".format(self)
+
+
     def __eq__(self, other):
         return self.name == other
 
 
 class programList(languageSyntaxOBbase):
 
-    def __init__(self, *blocks):
+    def __init__(self, *children):
         super().__init__()
-        self.blocks = blocks
+        self.children = children
 
+    def assemble(self):
+        return [i.assemble() for i in self.children]  # we're gonna get reallly nested
 
-class languageSyntaxOB(languageSyntaxOBbase):
+class comparisonTypeOB(languageSyntaxOBbase):
 
-    def __init__(self, mytype, *blocks):
+    replaceMap = {
+        "<":"le",
+        ">":"me",
+        "==":"eq",
+        "!=":"ne",
+        ">=":"meq",
+        "<=":"leq"
+    }
+
+    def __init__(self, comp, *args, **kwargs):
         super().__init__()
-        self.blocks = blocks
-        self.mytype = mytype
+        self.comp = list(comp)
+        self.comp[1] = replaceMap[comp[1]]
+
+
+class whileTypeOB(comparisonTypeOB):
+
+    def __init__(self, comp, *children):
+        super().__init__(comp)
+        self.children = children
+        self.comp = comp
+
+    def __str__(self):
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <comparison: {0.comp}>> <children: {1}>>".format(self, ", ".join("{}".format(str(i)) for i in self.children))
+
+
+class ifTypeOB(comparisonTypeOB):
+
+    def __init__(self, comp, *children):
+        super().__init__(comp)
+        self.children = children
+        self.comp = comp
+
+    def __str__(self):
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <comparison: {0.comp}> <children: {1}>>".format(self, ", ".join("{}".format(str(i)) for i in self.children))
+
+
+def languageSyntaxOB(type, *children):
+    types = {  # TODO: correct parser to do any form of "word (stuff) {code}"
+        "while": whileTypeOB,
+        "if": ifTypeOB
+    }
+
+    return types.get(type)(*children)
 
 
 class functionCallOB(languageSyntaxOBbase):
 
-    def __init__(self, *blocks):
+    def __init__(self, functionName, args):
         super().__init__()
-        self.blocks = blocks
+        self.functionName = functionName
+        self.args = args
+
+        self.children = args
+
+    def __str__(self):
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.functionName}> <args: {1}>>".format(self, ", ".join("{}".format(str(i)) for i in self.args))
+
 
 
 class comparisonOB(languageSyntaxOBbase):
 
-    def __init__(self, *blocks):
+    def __init__(self, *children):
         super().__init__()
-        self.blocks = blocks
+        self.children = children
 
 
-class varList:
-    def __init__(self, *vars_):
-        self.vars_ = vars_
+class varList(languageSyntaxOBbase):
+    def __init__(self, *children):
+        super().__init__()
+        self.children = children
 
 
 class functionDefineOB(languageSyntaxOBbase):
 
-    def __init__(self, name, params, vars_, program):
+    def __init__(self, name, params, vars_, children):
         super().__init__()
         self.name = name
         self.params = params
         self.vars_ = vars_
-        self.children = program
+        self.children = children
+
+    def __str__(self):
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.name}> <params: {0.params}> <vars: {0.vars_}> <children: {0.children}>>".format(self)
 
     def get_variable(self, VarName):
         if not self.parent:
@@ -175,7 +258,7 @@ class FuncCallSolver(SolverBase):
     def __init__(self):
         super().__init__()
         self.funcStructure = pp.Forward()
-        arg = pp.Group(self.funcStructure) | self.operand
+        arg = self.funcStructure | self.operand
         args = arg + pp.ZeroOrMore(self.comma + arg)
 
         self.funcStructure << self.variable + \
@@ -307,7 +390,7 @@ class FunctionDefineParser(SolverBase):
         ) + self.opening_curly_bracket + pp.OneOrMore(varline) + self.closing_curly_bracket
         varsblock.setParseAction(lambda s, l, t: varList(*t))
 
-        arg = self.variable
+        arg = copy.copy(self.variable)
         arg.setParseAction(lambda s, l, t: variableOB(*t, 0))
 
         args = self.variable + pp.ZeroOrMore(self.comma + self.variable)
@@ -315,13 +398,14 @@ class FunctionDefineParser(SolverBase):
         argblock = self.lparen + pp.Optional(args) + self.rparen
         argblock.setParseAction(lambda s, l, t: varList(*t))
 
-
+        func_name = copy.copy(self.variable)
+        func_name.setParseAction()
 
         startblock = pp.Word("func ").suppress(
         ) + self.variable + argblock + self.opening_curly_bracket
 
         self.function = startblock + \
-            pp.Optional(varsblock) + program + self.closing_curly_bracket
+            pp.Optional(varsblock, default=None) + program + self.closing_curly_bracket
         self.function.setParseAction(lambda s, l, t: functionDefineOB(*t))
 
     def parse(self, string):
@@ -364,4 +448,10 @@ if __name__ == "__main__":
     print(b.parse("func wew(a,b,c){vars{a:=2;b:=4;}program{call();}}"))
 
     c = ProgramSolver()
-    print(c.parse("func main(wew, lad){vars{wew;}program{callthis();wew:=3;}}"))
+    parsed = c.parse("func main(wew, lad){vars{wew;}program{while(1<2){callthis();}wew:=3;}}")[0]  #Type: functionDefineOB
+    parsed.parent_own_children()
+    print(format_string(str(parsed)))
+
+    second = c.parse("func main(a){program{while(1<3){print(this, more, that());}}}")[0]
+    second.parent_own_children()
+    print(format_string(str(second)))
