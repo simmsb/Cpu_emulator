@@ -17,19 +17,22 @@ class languageSyntaxOBbase:
         self.children = [None]
 
     def parent_own_children(self):
-        self.parent_children(*[self.children])
+        #print("{0} parenting children: {0.children}".format(self))
+        self.parent_children(self.children)
 
     def parent_children(self, *children):
+        #print("\n{} is filling parent of {}\n".format(
+        #        self.__class__.__name__, children))
         for i in children:
-            print(i)
+            #print("{}: {}".format(type(i), i))
             if isinstance(i, languageSyntaxOBbase):
-                print("\n{} is setting parent of {}\n".format(
-                    self.__class__.__name__, i))
+                #print("\n{} is setting parent of {}\n".format(
+            #        self.__class__.__name__, i))
                 i.set_parent(self)
                 i.parent_own_children()
-            elif isinstance(i, (list, tuple)):
-                print("\n{} is filling parent of {}\n".format(
-                    self.__class__.__name__, i))
+            elif isinstance(i, (list, tuple, pp.ParseResults)):
+                #print("\n{} is filling parent of {}\n".format(
+                #    self.__class__.__name__, i))
                 self.parent_children(*i)
 
     def set_parent(self, parent):
@@ -142,7 +145,7 @@ class whileTypeOB(languageSyntaxOBbase):
         self.children = [self.codeblock, self.comp]
 
     def __str__(self):
-        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <comparison: {0.comp}>> <codeblock: {1}>>".format(
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <comparison: {0.comp}> <codeblock: {1}>>".format(
             self, ", ".join("{}".format(str(i)) for i in self.codeblock))
 
 
@@ -168,17 +171,14 @@ def languageSyntaxOB(type_, *children):
 
 
 class functionCallOB(languageSyntaxOBbase):
-    def __init__(self, functionName, args):
+    def __init__(self, functionName, children):
         super().__init__()
         self.functionName = functionName
-        self.args = args
-
-        self.children = args
-        print("fcallob: {}".format(self.children))
+        self.children = children
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.functionName}> <args: {1}>>".format(
-            self, ", ".join("{}".format(str(i)) for i in self.args))
+            self, ", ".join("{}".format(str(i)) for i in self.children))
 
 
 class varList(languageSyntaxOBbase):
@@ -263,7 +263,7 @@ class FuncCallSolver(SolverBase):
         self.funcStructure = pp.Forward()
         arg = self.funcStructure | self.operand
         args = arg + pp.ZeroOrMore(self.comma + arg)
-        args.setParseAction(lambda t: varList(*t))  # TODO: fix this
+        args.setParseAction(lambda t: varList(*t))
 
         self.funcStructure << self.variable + \
             pp.Group(self.lparen + pp.Optional(args) + self.rparen)
@@ -453,6 +453,7 @@ if __name__ == "__main__":
     print(format_string(str(parsed)))
 
     second = c.parse(
-        "func main(a){program{while(1<3){print(this, more, that());}}}")[0]
-    second.parent_own_children()
-    print(format_string(str(second)))
+        "func main(a){program{if(this==that){a:=4;call(a);}while(1<3){print(this, more, that());}}} func call(a,b,c){vars{d;e:=333;f:=3;}program{d:=a*b*c;}}")
+    for i in second:
+        i.parent_own_children()
+        print(format_string(str(i)))

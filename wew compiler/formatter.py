@@ -1,5 +1,4 @@
 def format_string(string, indent=0):
-    string += ">"
     blocks = []
     brackets = 0
     for c, i in enumerate(string):
