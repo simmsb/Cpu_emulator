@@ -21,18 +21,11 @@ class languageSyntaxOBbase:
         self.parent_children(self.children)
 
     def parent_children(self, *children):
-        #print("\n{} is filling parent of {}\n".format(
-        #        self.__class__.__name__, children))
         for i in children:
-            #print("{}: {}".format(type(i), i))
             if isinstance(i, languageSyntaxOBbase):
-                #print("\n{} is setting parent of {}\n".format(
-            #        self.__class__.__name__, i))
                 i.set_parent(self)
                 i.parent_own_children()
             elif isinstance(i, (list, tuple, pp.ParseResults)):
-                #print("\n{} is filling parent of {}\n".format(
-                #    self.__class__.__name__, i))
                 self.parent_children(*i)
 
     def set_parent(self, parent):
@@ -67,7 +60,7 @@ class mathOP(languageSyntaxOBbase):
 
     def assemble(self):
         """
-        Use stack, infix -> postfix -> stack machine -> return variable in @RET
+        Use stack, infix -> postfix ->the stack machine -> return variable in @RET
         """
         return ["nop"]  # TODO: This pls
 
