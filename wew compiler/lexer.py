@@ -6,17 +6,22 @@ import pyparsing as pp
 
 # generates math trees, etc
 
+# this
+
+jumplabels = 0
 
 class ParseException(Exception):
     pass
 
 
 class languageSyntaxOBbase:
+    """Base class for language objects"""
     def __init__(self):
         self.parent = None
         self.children = [None]
 
     def parent_own_children(self):
+        """Initiates filling of child parents (for codegen callbacks)"""
         #print("{0} parenting children: {0.children}".format(self))
         self.parent_children(self.children)
 
@@ -32,6 +37,7 @@ class languageSyntaxOBbase:
         self.parent = parent
 
     def get_variable(self, VarName):
+        """Finds stack position of a variable, bubbles up to the parent function"""
         if not self.parent:
             raise ParseException(
                 "object: {} attempted to gain variable {}, but it has no parent".
@@ -47,6 +53,7 @@ class languageSyntaxOBbase:
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <children: {1}>>".format(
             self, ", ".join("{}".format(str(i)) for i in self.children))
+
 
 
 class mathOP(languageSyntaxOBbase):
@@ -110,13 +117,13 @@ class programList(languageSyntaxOBbase):
 
 class comparisonOB(languageSyntaxOBbase):
 
-    replaceMap = {
-        "<": "le",
-        ">": "me",
-        "==": "eq",
-        "!=": "ne",
-        ">=": "meq",
-        "<=": "leq"
+    replaceMap = {  # inversed, skips
+        "<": "meje",
+        ">": "leje",
+        "==": "nqje",
+        "!=": "eqje",
+        ">=": "lje",
+        "<=": "mje"
     }
 
     def __init__(self, left, comp, right):
@@ -140,6 +147,14 @@ class whileTypeOB(languageSyntaxOBbase):
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <comparison: {0.comp}> <codeblock: {1}>>".format(
             self, ", ".join("{}".format(str(i)) for i in self.codeblock))
+
+    def assemble(self):
+        jid = jumplabels
+        jumplabels += 1
+        comparator = "_jump_start_{} CMP {} {}".format(jid, self.get_variable(self.comp.left), self.get_variable(self.comp.right))
+        jump = "{} jump_end_{}".format(self.comp.comp, jid)
+
+        return [comparator, jump, [i.assemble() for i in self.children], "_jump_end_{}".format(jid)]
 
 
 class ifTypeOB(languageSyntaxOBbase):
@@ -332,14 +347,24 @@ class SyntaxBlockParser(SolverBase):
         return self.languageSyntaxOBject
 
 
+class StatementsObjects(SolverBase):
+    def __init__(self):
+        super().__init__()
+        return = pp.Word("return").suppress() + self.variable
+        ## more stuff here
+        return.setParseAction(lambda t: returnSTMOB(*t))
+        self.Statements = return
+
+
 class OperationsObjects(SolverBase):
     def __init__(self):
         super().__init__()
         SyntaxBlocks = SyntaxBlockParser().parseObject
         assignBlocks = AssignmentSolver().parseObject
         functionCallBlocks = FuncCallSolver().inline
+        statements = StatementsObjects().Statements  # consistency TODO: refactor
 
-        self.operation = SyntaxBlocks | assignBlocks | functionCallBlocks
+        self.operation = SyntaxBlocks | assignBlocks | functionCallBlocks | statements
 
     def parse(self, string):
         return self.operation.parseString(string).asList()
