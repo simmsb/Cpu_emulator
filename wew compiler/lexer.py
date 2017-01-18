@@ -80,6 +80,7 @@ class assignOP(languageSyntaxOBbase):
 
         self.children = [val]
 
+
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <setter: {0.setter}> <val: {0.val}>>".format(
             self)
