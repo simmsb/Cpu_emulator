@@ -201,7 +201,7 @@ class InstructionSet:
             self.cpu.memory[self.cpu.interpret_write_address(
                 memloc)] = int(input("Enter number: "))
 
-      # like anything wrong could happen here
+    # like anything wrong could happen here
     @instruction()
     @exception_wrapper
     def halt(self):
@@ -223,7 +223,7 @@ class InstructionSet:
     def popstk(self, memloc=None):
         if self.cpu.registers["stk"] > self.cpu.memory.size:
             return 0  # assume everything above maximum address is 0
-        if not memloc is None:
+        if memloc is not None:
             if memloc.startswith("@"):
                 self.cpu.registers[memloc.lstrip("@")] = self.cpu.memory[
                     self.cpu.registers["stk"]]
