@@ -3,12 +3,23 @@ from formatter import format_string
 
 import pyparsing as pp
 
-
 # generates math trees, etc
 
 # this
 
-jumplabels = 0
+JID = 0  # label counter
+
+
+class no_depth_list(list):
+    """Class that does not allow any nested lists to be appended, any iterables appended will be unpacked first """
+
+    def __lshift__(self, other):
+        try:
+            for i in other:
+                self << i
+        except:  # not iterable, so just append other
+            self.append(other)
+
 
 class ParseException(Exception):
     pass
@@ -16,13 +27,14 @@ class ParseException(Exception):
 
 class languageSyntaxOBbase:
     """Base class for language objects"""
-    def __init__(self):
+
+    def __init__(self, children):
         self.parent = None
-        self.children = [None]
+        self.children = children
 
     def parent_own_children(self):
         """Initiates filling of child parents (for codegen callbacks)"""
-        #print("{0} parenting children: {0.children}".format(self))
+        # print("{0} parenting children: {0.children}".format(self))
         self.parent_children(self.children)
 
     def parent_children(self, *children):
@@ -48,18 +60,21 @@ class languageSyntaxOBbase:
             return self.parent.get_variable(VarName)
 
     def assemble(self):
-        return ["nop"]
+        return no_depth_list(["nop"])
+
+    @property
+    def num_params(self):
+        return self.parent.num_params
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <children: {1}>>".format(
             self, ", ".join("{}".format(str(i)) for i in self.children))
 
 
-
 class mathOP(languageSyntaxOBbase):
+
     def __init__(self, *children):  # , op, b):
-        super().__init__()
-        self.children = children
+        super().__init__(children)
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <children: {1}>>".format(
@@ -69,17 +84,16 @@ class mathOP(languageSyntaxOBbase):
         """
         Use stack, infix -> postfix ->the stack machine -> return variable in @RET
         """
-        return ["nop"]  # TODO: This pls
+        ...   # TODO: This pls
 
 
 class assignOP(languageSyntaxOBbase):
+
     def __init__(self, setter, val):
-        super().__init__()
         self.setter = setter
         self.val = val
 
-        self.children = [val]
-
+        super().__init__(val)
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <setter: {0.setter}> <val: {0.val}>>".format(
@@ -87,12 +101,18 @@ class assignOP(languageSyntaxOBbase):
 
     def assemble(self):
         variable = self.get_variable(self.setter)
-        value = self.val.assemble()
+        left_side = self.val.assemble()
+        # output of left_side always ends in @ACC
 
-        return ["mov @ret {}".format(variable)]
+        out = no_depth_list()
+        for i in left_side:
+            out << left_side
+        out << f"MOV @ACC {variable}"
+        return out
 
 
 class variableOB(languageSyntaxOBbase):
+
     def __init__(self, name, initial_val):
         super().__init__()
         self.name = name
@@ -107,13 +127,17 @@ class variableOB(languageSyntaxOBbase):
 
 
 class programList(languageSyntaxOBbase):
+
     def __init__(self, *children):
         super().__init__()
         self.children = children
 
     def assemble(self):
-        return [i.assemble()
-                for i in self.children]  # we're gonna get reallly nested
+        out = no_depth_list()
+        for i in self.children:
+            out << i.assemble()
+
+        return out
 
 
 class comparisonOB(languageSyntaxOBbase):
@@ -139,6 +163,7 @@ class comparisonOB(languageSyntaxOBbase):
 
 
 class whileTypeOB(languageSyntaxOBbase):
+
     def __init__(self, comp, *codeblock):
         super().__init__()
         self.comp = comp
@@ -150,15 +175,21 @@ class whileTypeOB(languageSyntaxOBbase):
             self, ", ".join("{}".format(str(i)) for i in self.codeblock))
 
     def assemble(self):
-        jid = jumplabels
-        jumplabels += 1
-        comparator = "_jump_start_{} CMP {} {}".format(jid, self.get_variable(self.comp.left), self.get_variable(self.comp.right))
-        jump = "{} jump_end_{}".format(self.comp.comp, jid)
+        out = no_depth_list()
+        out << f"_jump_start_{JID} CMP {self.get_variable(self.comp.left)} {self.get_variable(self.comp.right)}"
+        out << f"{self.comp.comp} jump_end_{JID}"
+        for i in self.codeblock:
+            out << i.assemble()
+        out << f"JMP jump_start_{JID}"
+        out << f"_jump_end_{JID} NOP"
 
-        return [comparator, jump, [i.assemble() for i in self.codeblock], "jmp jump_start_{}".format(jid),  "_jump_end_{} nop".format(jid)]
+        JID += 1
+
+        return out
 
 
 class ifTypeOB(languageSyntaxOBbase):
+
     def __init__(self, comp, *codeblock):
         super().__init__()
         self.comp = comp
@@ -166,13 +197,16 @@ class ifTypeOB(languageSyntaxOBbase):
         self.children = [self.codeblock, self.comp]
 
     def assemble(self):
-        jid = jumplabels
-        jumplabels += 1
-        comparator = "CMP {} {}".format(self.get_variable(self.comp.left), self.get_variable(self.comp.right))
-        jump = "{} jump_end_{}".format(self.comp.comp, jid)
+        out = no_depth_list()
+        out << f"CMP {self.get_variable(self.comp.left)} {self.get_variable(self.comp.right)}"
+        out << f"{self.comp.comp} jump_end_{JID}"
+        for i in self.codeblock:
+            out << i.assemble()
+        out << f"_jump_end_{JID} NOP"
 
-        return [copmarator, jump, [i.assemble() for i in self.codeblock], "_jump_end_{} NOP".format(jid)]
+        JID += 1
 
+        return out
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <comparison: {0.comp}> <codeblock: {1}>>".format(
@@ -185,10 +219,11 @@ def languageSyntaxOB(type_, *children):
         "if": ifTypeOB
     }
 
-    return types.get(type_)(*children)
+    return types[type_](*children)
 
 
 class functionCallOB(languageSyntaxOBbase):
+
     def __init__(self, functionName, children):
         super().__init__()
         self.functionName = functionName
@@ -200,12 +235,14 @@ class functionCallOB(languageSyntaxOBbase):
 
 
 class varList(languageSyntaxOBbase):
+
     def __init__(self, *children):
         super().__init__()
         self.children = children
 
 
 class functionDefineOB(languageSyntaxOBbase):
+
     def __init__(self, name, params, vars_, children):
         super().__init__()
         self.name = name
@@ -241,7 +278,7 @@ class functionDefineOB(languageSyntaxOBbase):
             |a|  + 3, 0
             |b|  + 2, 1
             |c|  + 1, 2
-            |old stack pointer| +- 0
+            |old local stack pointer| +- 0
             |d|  - 1, 0
             |e|  - 2, 1
 
@@ -255,6 +292,31 @@ class functionDefineOB(languageSyntaxOBbase):
                 raise ParseException(
                     "Attempt to access variable not in scope. Current function: {}, variable: {}".
                     format(self.name, VarName))
+
+        @property
+        def num_params(self):
+            return len(self.params)
+
+
+class returnStmtOB(languageSyntaxOBbase):
+
+    def assemble(self):
+        out = no_depth_list()
+        """
+        how to return:
+            move returned variable to @RET
+            move @LSTK to @STK (reset stack pointer)
+            move [@LSTK] to @STK (return old pointer)
+            add <number of vars> to @STK (push stack above pointer)
+            call RET
+        """
+        out << f"MOV {} @RET"
+        out << "MOV @LSTK @STK"
+        out << "MOV [@STK+0] @LSTK"
+        out << "MOV @STK @ACC"
+        out << f"ADD {self.num_params}"
+        out << "MOV @ACC @STK"
+        out << "RET"
 
 
 class atoms:
@@ -275,34 +337,20 @@ class atoms:
 
 
 class FuncCallSolver:
-    funcStructure = pp.Forward()
-    arg = funcStructure | atoms.operand
+    functionCall = pp.Forward()
+    arg = functionCall | atoms.operand
     args = arg + pp.ZeroOrMore(atoms.comma + arg)
     args.setParseAction(lambda t: varList(*t))
 
-    funcStructure << atoms.variable + \
+    functionCall << atoms.variable + \
         pp.Group(atoms.lparen + pp.Optional(args) + atoms.rparen)
-    funcStructure.setParseAction(lambda s, l, t: functionCallOB(*t))
+    functionCall.setParseAction(lambda s, l, t: functionCallOB(*t))
 
-    FuncCall = funcStructure + atoms.semicol
-
-    def parse(self, string):
-        return self.funcStructure.parseString(string).asList()
-
-    @property
-    def in_op(self):
-        """something := func()
-        func(func2());"""
-        return self.funcStructure
-
-    @property
-    def inline(self):
-        """func();"""
-        return self.FuncCall
+    functionCallInline = functionCall + atoms.semicol
 
 
 class AssignmentSolver:
-    operator = FuncCallSolver.funcStructure | atoms.oprerand
+    operator = FuncCallSolver.functionCall | atoms.operand
 
     addsub = pp.oneOf("+ -")
     muldiv = pp.oneOf("* /")
@@ -314,83 +362,54 @@ class AssignmentSolver:
         oplist).setParseAction(lambda s, l, t: mathOP(t.asList()))
 
     assign = atoms.variable + atoms.equals + expr
-    assignment_call = assign + atoms.semicol
-    assignment_call.setParseAction(lambda s, l, t: assignOP(*t))
-
-    def parse(self, string):
-        return self.assignment_call.parseString(string).asList()
-
-    @property
-    def parseObject(self):
-        return self.assignment_call
+    assignmentCall = assign + atoms.semicol
+    assignmentCall.setParseAction(lambda s, l, t: assignOP(*t))
 
 
 class SyntaxBlockParser:
 
-        program = AssignmentSolver.parseObject | FuncCallSolver.inline
-        languageSyntaxObject = pp.Forward()
+    program = AssignmentSolver.assignmentCall | FuncCallSolver.functionCallInline
+    languageSyntaxObject = pp.Forward()
 
-        Syntaxblk = pp.OneOrMore(pp.Group(languageSyntaxObject) | program)
+    Syntaxblk = pp.OneOrMore(pp.Group(languageSyntaxObject) | program)
 
-        condition = atoms.lparen + atoms.oprerand +
-            atoms.comparison + atoms.oprerand + atoms.rparen
-        condition.setParseAction(lambda s, l, t: comparisonOB(*t))
+    condition = atoms.lparen + atoms.operand + \
+        atoms.comparison + atoms.operand + atoms.rparen
+    condition.setParseAction(lambda s, l, t: comparisonOB(*t))
 
-        syntaxBlocks = pp.oneOf("while if")
+    syntaxBlocks = pp.oneOf("while if")
 
-        languageSyntaxOBject << syntaxBlocks + condition + \
-            atoms.opening_curly_bracket + Syntaxblk + atoms.closing_curly_bracket
-        languageSyntaxOBject.setParseAction(
-            lambda s, l, t: languageSyntaxOB(*t))
-
-    def parse(self, string):
-        return self.languageSyntaxOBject.parseString(string).asList()
-
-    @property
-    def parseObject(self):
-        return self.languageSyntaxOBject
+    syntaxBlock << syntaxBlocks + condition + \
+        atoms.opening_curly_bracket + Syntaxblk + atoms.closing_curly_bracket
+    syntaxBlock.setParseAction(
+        lambda s, l, t: languageSyntaxOB(*t))
 
 
-class StatementsObjects(SolverBase):
-    statements = (pp.Word("return").suppress() + atoms.variable).setParseAction(lambda t: returnSTMOB(*t))
+class returnStatement:
+
+    statements = (pp.Word("return").suppress() +
+                  atoms.variable).setParseAction(lambda t: returnStmtOB(*t))
 
 
-class OperationsObjects(SolverBase):
-    def __init__(self):
-        super().__init__()
-        SyntaxBlocks = SyntaxBlockParser.parseObject
-        assignBlocks = AssignmentSolver.parseObject
-        functionCallBlocks = FuncCallSolver.inline
-        statements = StatementsObjects.statements  # consistency TODO: refactor
+class OperationsObjects:
 
-        self.operation = SyntaxBlocks | assignBlocks | functionCallBlocks | statements
+    SyntaxBlocks = SyntaxBlockParser.syntaxBlock
+    assignBlocks = AssignmentSolver.assignmentCall
+    functionCallBlocks = FuncCallSolver.inline
+    statements = returnStatement.return_  # consistency TODO: refactor
 
-    def parse(self, string):
-        return self.operation.parseString(string).asList()
-
-    @property
-    def parseObject(self):
-        return self.operation
+    operation = SyntaxBlocks | assignBlocks | functionCallBlocks | statements
 
 
 class ProgramObjects(OperationsObjects):
-    def __init__(self):
-        super().__init__()
 
-        self.program = pp.Word("program").suppress(
-        ) + atoms.opening_curly_bracket + pp.OneOrMore(
-            self.operation) + atoms.closing_curly_bracket
-        self.program.setParseAction(lambda s, l, t: programList(*t))
-
-    def parse(self, string):
-        return self.program.parseString(string).asList()
-
-    @property
-    def parseObject(self):
-        return self.program
+    program = pp.Word("program").suppress() + atoms.opening_curly_bracket + pp.OneOrMore(
+        operation) + atoms.closing_curly_bracket
+    self.program.setParseAction(lambda s, l, t: programList(*t))
 
 
 class FunctionDefineParser(SolverBase):
+
     def __init__(self):
         super().__init__()
         program = ProgramObjects().parseObject
@@ -421,27 +440,18 @@ class FunctionDefineParser(SolverBase):
         ) + atoms.variable + argblock + atoms.opening_curly_bracket
 
         self.function = startblock + \
-            pp.Optional(varsblock, default=None) + program + atoms.closing_curly_bracket
+            pp.Optional(varsblock, default=None) + \
+            program + atoms.closing_curly_bracket
         self.function.setParseAction(lambda s, l, t: functionDefineOB(*t))
-
-    def parse(self, string):
-        return self.function.parseString(string).asList()
-
-    @property
-    def parseObject(self):
-        return self.function
 
 
 class ProgramSolver:
+
     def __init__(self):
         self.functions = pp.OneOrMore(FunctionDefineParser().function)
 
     def parse(self, string):
         return self.functions.parseString(string).asList()
-
-    @property
-    def parseObject(self):
-        return self.functions
 
 
 if __name__ == "__main__":
@@ -465,7 +475,7 @@ if __name__ == "__main__":
     c = ProgramSolver()
     parsed = c.parse(
         "func main(wew, lad){vars{wew;}program{while(1<2){callthis();}wew:=3;}}"
-    )[0]  #Type: functionDefineOB
+    )[0]  # Type: functionDefineOB
     parsed.parent_own_children()
     print(format_string(str(parsed)))
 
