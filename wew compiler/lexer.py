@@ -155,7 +155,7 @@ class whileTypeOB(languageSyntaxOBbase):
         comparator = "_jump_start_{} CMP {} {}".format(jid, self.get_variable(self.comp.left), self.get_variable(self.comp.right))
         jump = "{} jump_end_{}".format(self.comp.comp, jid)
 
-        return [comparator, jump, [i.assemble() for i in self.children], "_jump_end_{}".format(jid)]
+        return [comparator, jump, [i.assemble() for i in self.codeblock], "jmp jump_start_{}".format(jid),  "_jump_end_{} nop".format(jid)]
 
 
 class ifTypeOB(languageSyntaxOBbase):
@@ -164,6 +164,15 @@ class ifTypeOB(languageSyntaxOBbase):
         self.comp = comp
         self.codeblock = codeblock
         self.children = [self.codeblock, self.comp]
+
+    def assemble(self):
+        jid = jumplabels
+        jumplabels += 1
+        comparator = "CMP {} {}".format(self.get_variable(self.comp.left), self.get_variable(self.comp.right))
+        jump = "{} jump_end_{}".format(self.comp.comp, jid)
+
+        return [copmarator, jump, [i.assemble() for i in self.codeblock], "_jump_end_{} NOP".format(jid)]
+
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <comparison: {0.comp}> <codeblock: {1}>>".format(
@@ -248,37 +257,34 @@ class functionDefineOB(languageSyntaxOBbase):
                     format(self.name, VarName))
 
 
-class SolverBase:
-    def __init__(self):
-        self.integer = pp.Word(pp.nums).setParseAction(lambda t: int(t[0]))
-        self.variable = pp.Word(pp.alphas + "_", pp.alphanums + "_", exact=0)
-        self.operand = self.integer | self.variable
-        self.semicol = pp.Literal(";").suppress()
-        self.equals = pp.Literal(":=").suppress()
+class atoms:
+    integer = pp.Word(pp.nums).setParseAction(lambda t: int(t[0]))
+    variable = pp.Word(pp.alphas + "_", pp.alphanums + "_", exact=0)
+    operand = integer | variable
+    semicol = pp.Literal(";").suppress()
+    equals = pp.Literal(":=").suppress()
 
-        self.opening_curly_bracket = pp.Literal("{").suppress()
-        self.closing_curly_bracket = pp.Literal("}").suppress()
+    opening_curly_bracket = pp.Literal("{").suppress()
+    closing_curly_bracket = pp.Literal("}").suppress()
 
-        self.lparen = pp.Literal("(").suppress()
-        self.rparen = pp.Literal(")").suppress()
-        self.comma = pp.Literal(",").suppress()
+    lparen = pp.Literal("(").suppress()
+    rparen = pp.Literal(")").suppress()
+    comma = pp.Literal(",").suppress()
 
-        self.comparison = pp.oneOf("== != > < >= <=")
+    comparison = pp.oneOf("== != > < >= <=")
 
 
-class FuncCallSolver(SolverBase):
-    def __init__(self):
-        super().__init__()
-        self.funcStructure = pp.Forward()
-        arg = self.funcStructure | self.operand
-        args = arg + pp.ZeroOrMore(self.comma + arg)
-        args.setParseAction(lambda t: varList(*t))
+class FuncCallSolver:
+    funcStructure = pp.Forward()
+    arg = funcStructure | atoms.operand
+    args = arg + pp.ZeroOrMore(atoms.comma + arg)
+    args.setParseAction(lambda t: varList(*t))
 
-        self.funcStructure << self.variable + \
-            pp.Group(self.lparen + pp.Optional(args) + self.rparen)
-        self.funcStructure.setParseAction(lambda s, l, t: functionCallOB(*t))
+    funcStructure << atoms.variable + \
+        pp.Group(atoms.lparen + pp.Optional(args) + atoms.rparen)
+    funcStructure.setParseAction(lambda s, l, t: functionCallOB(*t))
 
-        self.FuncCall = self.funcStructure + self.semicol
+    FuncCall = funcStructure + atoms.semicol
 
     def parse(self, string):
         return self.funcStructure.parseString(string).asList()
@@ -295,23 +301,21 @@ class FuncCallSolver(SolverBase):
         return self.FuncCall
 
 
-class AssignmentSolver(FuncCallSolver):
-    def __init__(self):
-        super().__init__()
-        operator = self.funcStructure | self.operand
+class AssignmentSolver:
+    operator = FuncCallSolver.funcStructure | atoms.oprerand
 
-        addsub = pp.oneOf("+ -")
-        muldiv = pp.oneOf("* /")
+    addsub = pp.oneOf("+ -")
+    muldiv = pp.oneOf("* /")
 
-        oplist = [(muldiv, 2, pp.opAssoc.RIGHT), (addsub, 2, pp.opAssoc.RIGHT)]
+    oplist = [(muldiv, 2, pp.opAssoc.RIGHT), (addsub, 2, pp.opAssoc.RIGHT)]
 
-        expr = pp.operatorPrecedence(
-            operator,
-            oplist).setParseAction(lambda s, l, t: mathOP(t.asList()))
+    expr = pp.operatorPrecedence(
+        operator,
+        oplist).setParseAction(lambda s, l, t: mathOP(t.asList()))
 
-        assign = self.variable + self.equals + expr
-        self.assignment_call = assign + self.semicol
-        self.assignment_call.setParseAction(lambda s, l, t: assignOP(*t))
+    assign = atoms.variable + atoms.equals + expr
+    assignment_call = assign + atoms.semicol
+    assignment_call.setParseAction(lambda s, l, t: assignOP(*t))
 
     def parse(self, string):
         return self.assignment_call.parseString(string).asList()
@@ -321,23 +325,22 @@ class AssignmentSolver(FuncCallSolver):
         return self.assignment_call
 
 
-class SyntaxBlockParser(SolverBase):
-    def __init__(self):
-        super().__init__()
-        program = AssignmentSolver().parseObject | FuncCallSolver().inline
-        self.languageSyntaxOBject = pp.Forward()
+class SyntaxBlockParser:
 
-        Syntaxblk = pp.OneOrMore(pp.Group(self.languageSyntaxOBject) | program)
+        program = AssignmentSolver.parseObject | FuncCallSolver.inline
+        languageSyntaxObject = pp.Forward()
 
-        condition = self.lparen + self.operand + \
-            self.comparison + self.operand + self.rparen
+        Syntaxblk = pp.OneOrMore(pp.Group(languageSyntaxObject) | program)
+
+        condition = atoms.lparen + atoms.oprerand +
+            atoms.comparison + atoms.oprerand + atoms.rparen
         condition.setParseAction(lambda s, l, t: comparisonOB(*t))
 
         syntaxBlocks = pp.oneOf("while if")
 
-        self.languageSyntaxOBject << syntaxBlocks + condition + \
-            self.opening_curly_bracket + Syntaxblk + self.closing_curly_bracket
-        self.languageSyntaxOBject.setParseAction(
+        languageSyntaxOBject << syntaxBlocks + condition + \
+            atoms.opening_curly_bracket + Syntaxblk + atoms.closing_curly_bracket
+        languageSyntaxOBject.setParseAction(
             lambda s, l, t: languageSyntaxOB(*t))
 
     def parse(self, string):
@@ -349,21 +352,16 @@ class SyntaxBlockParser(SolverBase):
 
 
 class StatementsObjects(SolverBase):
-    def __init__(self):
-        super().__init__()
-        return = pp.Word("return").suppress() + self.variable
-        ## more stuff here
-        return.setParseAction(lambda t: returnSTMOB(*t))
-        self.Statements = return
+    statements = (pp.Word("return").suppress() + atoms.variable).setParseAction(lambda t: returnSTMOB(*t))
 
 
 class OperationsObjects(SolverBase):
     def __init__(self):
         super().__init__()
-        SyntaxBlocks = SyntaxBlockParser().parseObject
-        assignBlocks = AssignmentSolver().parseObject
-        functionCallBlocks = FuncCallSolver().inline
-        statements = StatementsObjects().Statements  # consistency TODO: refactor
+        SyntaxBlocks = SyntaxBlockParser.parseObject
+        assignBlocks = AssignmentSolver.parseObject
+        functionCallBlocks = FuncCallSolver.inline
+        statements = StatementsObjects.statements  # consistency TODO: refactor
 
         self.operation = SyntaxBlocks | assignBlocks | functionCallBlocks | statements
 
@@ -380,8 +378,8 @@ class ProgramObjects(OperationsObjects):
         super().__init__()
 
         self.program = pp.Word("program").suppress(
-        ) + self.opening_curly_bracket + pp.OneOrMore(
-            self.operation) + self.closing_curly_bracket
+        ) + atoms.opening_curly_bracket + pp.OneOrMore(
+            self.operation) + atoms.closing_curly_bracket
         self.program.setParseAction(lambda s, l, t: programList(*t))
 
     def parse(self, string):
@@ -397,33 +395,33 @@ class FunctionDefineParser(SolverBase):
         super().__init__()
         program = ProgramObjects().parseObject
 
-        var_assign_line = self.variable + self.equals + self.integer + self.semicol
+        var_assign_line = atoms.variable + atoms.equals + atoms + atoms.semicol
         var_assign_line.setParseAction(lambda s, l, t: variableOB(*t))
-        var_noassign_line = self.variable + self.semicol
+        var_noassign_line = atoms.variable + atoms.semicol
         var_noassign_line.setParseAction(
             lambda s, l, t: variableOB(*t, 0))  # init with 0
         varline = var_assign_line | var_noassign_line
         varsblock = pp.Word("vars").suppress(
-        ) + self.opening_curly_bracket + pp.OneOrMore(
-            varline) + self.closing_curly_bracket
+        ) + atoms.opening_curly_bracket + pp.OneOrMore(
+            varline) + atoms.closing_curly_bracket
         varsblock.setParseAction(lambda s, l, t: varList(*t))
 
-        arg = copy.copy(self.variable)
+        arg = copy.copy(atoms.variable)
         arg.setParseAction(lambda s, l, t: variableOB(*t, 0))
 
-        args = self.variable + pp.ZeroOrMore(self.comma + self.variable)
+        args = atoms.variable + pp.ZeroOrMore(atoms.comma + atoms.variable)
 
-        argblock = self.lparen + pp.Optional(args) + self.rparen
+        argblock = atoms.lparen + pp.Optional(args) + atoms.rparen
         argblock.setParseAction(lambda s, l, t: varList(*t))
 
-        func_name = copy.copy(self.variable)
+        func_name = copy.copy(atoms.variable)
         func_name.setParseAction()
 
         startblock = pp.Word("func ").suppress(
-        ) + self.variable + argblock + self.opening_curly_bracket
+        ) + atoms.variable + argblock + atoms.opening_curly_bracket
 
         self.function = startblock + \
-            pp.Optional(varsblock, default=None) + program + self.closing_curly_bracket
+            pp.Optional(varsblock, default=None) + program + atoms.closing_curly_bracket
         self.function.setParseAction(lambda s, l, t: functionDefineOB(*t))
 
     def parse(self, string):
