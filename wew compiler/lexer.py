@@ -1,6 +1,6 @@
 import copy
 from formatter import format_string
-
+import traceback
 import pyparsing as pp
 
 
@@ -13,9 +13,13 @@ class no_depth_list(list):
     """Class that does not allow any nested lists to be appended, any iterables appended will be unpacked first """
 
     def __lshift__(self, other):
+        if isinstance(other, str):
+            self.append(other)
+            return
         try:
             for i in other:
                 self << i
+                print(f"NDL: {self}")
         except:  # not iterable, so just append other
             self.append(other)
 
@@ -56,26 +60,35 @@ class languageSyntaxOBbase:
 
         else:
             # this should bubble up to the parent function
+            print(f"getting variable {VarName}")
             return self.parent.get_variable(VarName)
 
     @classmethod
     def assemble_list(cls, cmds):
         out = no_depth_list()
+        if isinstance(cmds, str):
+            return cmds
         try:
-            for i in cmds:
-                out << cls.assemble_list(i)
+                for i in cmds:
+                    out << cls.assemble_list(i)
+                    print(f"IT: {out}")
         except:
             try:
-                out << cmds.assemble()
+                if isinstance(cmds, languageSyntaxOBbase):
+                    out << cmds.assemble()
+                    print(f"NM: {out}")
+                else:
+                    out << cmds
+                    print("SP: {out}")
             except Exception as e:
+                print(traceback.print_exc())
                 print(f"tried to assemble type {type(cmds)}, reason = {e}")
-                pass
-        return out
+        finally:
+            return out
 
     def assemble(self):
         out = no_depth_list()
-        for i in self.assemble_list(self.children):
-            out << i
+        out << self.assemble_list(self.children)
 
         return out
 
@@ -118,12 +131,12 @@ class assignOP(languageSyntaxOBbase):
 
     def assemble(self):
         variable = self.get_variable(self.setter)
+        print(variable)
         left_side = self.val.assemble()
         # output of left_side always ends in @ACC
 
         out = no_depth_list()
-        for i in self.assemble_list(left_side):
-            out << i
+        out << self.assemble_list(left_side)
         out << f"MOV @ACC {variable}"
         print(f"ASSIGNOP COMP OUT: {out}")
         return out
@@ -152,10 +165,7 @@ class programList(languageSyntaxOBbase):
 
     def assemble(self):
         out = no_depth_list()
-        for i in self.assemble_list(self.children):
-            print(type(i))
-            print(i)
-            out << i.assemble()
+        out << self.assemble_list(self.children)
 
         return out
 
@@ -222,13 +232,17 @@ class ifTypeOB(languageSyntaxOBbase):
         global JID
 
         out = no_depth_list()
+        print(self.comp.left)
+        print(self.comp.right)
         out << f"CMP {self.get_variable(self.comp.left)} {self.get_variable(self.comp.right)}"
+        print(out)
         out << f"{self.comp.comp} jump_end_{JID}"
-        print(self.codeblock)
+        print(f"IFTYPE: {self.codeblock}")
         for i in self.assemble_list(self.codeblock):
             out << i.assemble()
+            print(out)
         out << f"_jump_end_{JID} NOP"
-
+        print(out)
         JID += 1
 
         return out
@@ -262,8 +276,11 @@ class functionCallOB(languageSyntaxOBbase):
 class varList(languageSyntaxOBbase):
 
     def __init__(self, *children):
-        super().__init__()
-        self.children = children
+        super().__init__(*children)
+        print(self.children)
+
+    def assemble(self):
+        return no_var_list(["NOP"])
 
 
 class functionDefineOB(languageSyntaxOBbase):
@@ -301,17 +318,22 @@ class functionDefineOB(languageSyntaxOBbase):
         |e|  - 2, 1
 
         '''
-        if VarName in self.params:
-            ret = "[@lstk+{}]".format(
-                self.params.vars_[::-1].index(VarName) + 1)
-        elif VarName in self.vars:
-            ret = "[@lstk-{}]".format(
-                self.vars_.vars_index(VarName) + 1)
+        print(f"getting variable {VarName}, t: {type(VarName)}")
+        print(type(self.params))
+        ret = None
+        if self.params:
+            if VarName in self.params.children:
+                ret = "[@lstk+{}]".format(self.params.children[::-1].index(VarName) + 1)
+        elif self.vars_:
+            if VarName in self.vars_.children:
+                ret = "[@lstk-{}]".format(
+                    self.vars_.children.index(VarName) + 1)
         else:
             raise ParseException(
                 "Attempt to access variable not in scope. Current function: {}, variable: {}".
                 format(self.name, VarName))
         print(f"getting var: {VarName}, result was: {ret}")
+        return ret
 
         @property
         def num_params(self):
@@ -493,7 +515,7 @@ if __name__ == "__main__":
 
     b = FunctionDefineParser()
     print(b.parse("func wew(a,b,c){vars{a:=2;b:=4;}program{call();}}"))
-
+    """
     c = ProgramSolver()
     parsed = c.parse(
         "func main(wew, lad){vars{wew;}program{while(1<2){callthis();}wew:=3;}}")[0]
@@ -501,7 +523,6 @@ if __name__ == "__main__":
     print("######FIRST######")
     print(format_string(str(parsed)))
     print("######__END__FIRST######")
-    """
 
     second = c.parse(
         "func main(a){program{if(this==that){a:=4;call(a);}while(1<3){print(this, more, that());}}} func call(a,b,c){vars{d;e:=333;f:=3;}program{d:=a*b*c;}}")
