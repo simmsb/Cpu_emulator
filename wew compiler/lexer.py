@@ -3,11 +3,10 @@ from formatter import format_string
 
 import pyparsing as pp
 
+
 # generates math trees, etc
 
 # this
-
-JID = 0  # label counter
 
 
 class no_depth_list(list):
@@ -28,7 +27,7 @@ class ParseException(Exception):
 class languageSyntaxOBbase:
     """Base class for language objects"""
 
-    def __init__(self, children):
+    def __init__(self, *children):
         self.parent = None
         self.children = children
 
@@ -59,8 +58,26 @@ class languageSyntaxOBbase:
             # this should bubble up to the parent function
             return self.parent.get_variable(VarName)
 
+    @classmethod
+    def assemble_list(cls, cmds):
+        out = no_depth_list()
+        try:
+            for i in cmds:
+                out << cls.assemble_list(i)
+        except:
+            try:
+                out << cmds.assemble()
+            except Exception as e:
+                print(f"tried to assemble type {type(cmds)}, reason = {e}")
+                pass
+        return out
+
     def assemble(self):
-        return no_depth_list(["nop"])
+        out = no_depth_list()
+        for i in self.assemble_list(self.children):
+            out << i
+
+        return out
 
     @property
     def num_params(self):
@@ -84,7 +101,7 @@ class mathOP(languageSyntaxOBbase):
         """
         Use stack, infix -> postfix ->the stack machine -> return variable in @RET
         """
-        ...   # TODO: This pls
+        return no_depth_list(["NOP"])  # TODO: This pls
 
 
 class assignOP(languageSyntaxOBbase):
@@ -105,9 +122,10 @@ class assignOP(languageSyntaxOBbase):
         # output of left_side always ends in @ACC
 
         out = no_depth_list()
-        for i in left_side:
-            out << left_side
+        for i in self.assemble_list(left_side):
+            out << i
         out << f"MOV @ACC {variable}"
+        print(f"ASSIGNOP COMP OUT: {out}")
         return out
 
 
@@ -115,6 +133,7 @@ class variableOB(languageSyntaxOBbase):
 
     def __init__(self, name, initial_val):
         super().__init__()
+        self.type = NotImplemented  # TODO: Implement types
         self.name = name
         self.initial = initial_val
 
@@ -129,12 +148,13 @@ class variableOB(languageSyntaxOBbase):
 class programList(languageSyntaxOBbase):
 
     def __init__(self, *children):
-        super().__init__()
-        self.children = children
+        super().__init__(*children)
 
     def assemble(self):
         out = no_depth_list()
-        for i in self.children:
+        for i in self.assemble_list(self.children):
+            print(type(i))
+            print(i)
             out << i.assemble()
 
         return out
@@ -175,10 +195,12 @@ class whileTypeOB(languageSyntaxOBbase):
             self, ", ".join("{}".format(str(i)) for i in self.codeblock))
 
     def assemble(self):
+        global JID
+
         out = no_depth_list()
         out << f"_jump_start_{JID} CMP {self.get_variable(self.comp.left)} {self.get_variable(self.comp.right)}"
         out << f"{self.comp.comp} jump_end_{JID}"
-        for i in self.codeblock:
+        for i in self.assemble_list(self.codeblock):
             out << i.assemble()
         out << f"JMP jump_start_{JID}"
         out << f"_jump_end_{JID} NOP"
@@ -197,10 +219,13 @@ class ifTypeOB(languageSyntaxOBbase):
         self.children = [self.codeblock, self.comp]
 
     def assemble(self):
+        global JID
+
         out = no_depth_list()
         out << f"CMP {self.get_variable(self.comp.left)} {self.get_variable(self.comp.right)}"
         out << f"{self.comp.comp} jump_end_{JID}"
-        for i in self.codeblock:
+        print(self.codeblock)
+        for i in self.assemble_list(self.codeblock):
             out << i.assemble()
         out << f"_jump_end_{JID} NOP"
 
@@ -244,54 +269,49 @@ class varList(languageSyntaxOBbase):
 class functionDefineOB(languageSyntaxOBbase):
 
     def __init__(self, name, params, vars_, children):
-        super().__init__()
+        super().__init__(children)
         self.name = name
         self.params = params
         self.vars_ = vars_
-        self.children = children
 
     def __str__(self):
-        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.name}> <params: {0.params}> <vars: {0.vars_}> <children: {0.children}>>".format(
-            self)
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.name}> <params: {0.params}> <vars: {0.vars_}> <children: {1}>>".format(
+            self, [str(i) for i in self.children])
 
     def get_variable(self, VarName):
-        if not self.parent:
-            raise ParseException(
-                "object: {} attempted to gain variable {}, but it has no parent".
-                format(self, VarName))
-
-        else:
-            '''
-            func wew(a,b,c){
-                vars{
-                    d:=0;
-                    e:=4;
-                }
-                program{
-                    return a
-                }
+        '''
+        func wew(a,b,c){
+            vars{
+                d:=0;
+                e:=4;
             }
+            program{
+                return a
+            }
+        }
 
 
-            stack; |var| position relative to @lstk, position in var/ param list:
+        stack; |var| position relative to @lstk, position in var/ param list:
 
-            |a|  + 3, 0
-            |b|  + 2, 1
-            |c|  + 1, 2
-            |old local stack pointer| +- 0
-            |d|  - 1, 0
-            |e|  - 2, 1
+        |a|  + 3, 0
+        |b|  + 2, 1
+        |c|  + 1, 2
+        |old local stack pointer| +- 0
+        |d|  - 1, 0
+        |e|  - 2, 1
 
-            '''
-            if VarName in self.params:
-                return "[@lstk+{}]".format(self.params.vars_[::-1].index(
-                    VarName) + 1)
-            elif VarName in self.vars:
-                return "[@lstk-{}]".format(self.vars_.vars_index(VarName) + 1)
-            else:
-                raise ParseException(
-                    "Attempt to access variable not in scope. Current function: {}, variable: {}".
-                    format(self.name, VarName))
+        '''
+        if VarName in self.params:
+            ret = "[@lstk+{}]".format(
+                self.params.vars_[::-1].index(VarName) + 1)
+        elif VarName in self.vars:
+            ret = "[@lstk-{}]".format(
+                self.vars_.vars_index(VarName) + 1)
+        else:
+            raise ParseException(
+                "Attempt to access variable not in scope. Current function: {}, variable: {}".
+                format(self.name, VarName))
+        print(f"getting var: {VarName}, result was: {ret}")
 
         @property
         def num_params(self):
@@ -310,7 +330,7 @@ class returnStmtOB(languageSyntaxOBbase):
             add <number of vars> to @STK (push stack above pointer)
             call RET
         """
-        out << f"MOV {} @RET"
+        out << f"MOV {self.get_variable(self.child)} @RET"
         out << "MOV @LSTK @STK"
         out << "MOV [@STK+0] @LSTK"
         out << "MOV @STK @ACC"
@@ -369,17 +389,17 @@ class AssignmentSolver:
 class SyntaxBlockParser:
 
     program = AssignmentSolver.assignmentCall | FuncCallSolver.functionCallInline
-    languageSyntaxObject = pp.Forward()
+    syntaxBlock = pp.Forward()
 
-    Syntaxblk = pp.OneOrMore(pp.Group(languageSyntaxObject) | program)
+    Syntaxblk = pp.OneOrMore(pp.Group(syntaxBlock) | program)
 
     condition = atoms.lparen + atoms.operand + \
         atoms.comparison + atoms.operand + atoms.rparen
     condition.setParseAction(lambda s, l, t: comparisonOB(*t))
 
-    syntaxBlocks = pp.oneOf("while if")
+    blockTypes = pp.oneOf("while if")
 
-    syntaxBlock << syntaxBlocks + condition + \
+    syntaxBlock << blockTypes + condition + \
         atoms.opening_curly_bracket + Syntaxblk + atoms.closing_curly_bracket
     syntaxBlock.setParseAction(
         lambda s, l, t: languageSyntaxOB(*t))
@@ -387,74 +407,76 @@ class SyntaxBlockParser:
 
 class returnStatement:
 
-    statements = (pp.Word("return").suppress() +
-                  atoms.variable).setParseAction(lambda t: returnStmtOB(*t))
+    returnStmnt = (pp.Word("return").suppress() +
+                   atoms.variable).setParseAction(lambda t: returnStmtOB(*t))
 
 
 class OperationsObjects:
 
     SyntaxBlocks = SyntaxBlockParser.syntaxBlock
     assignBlocks = AssignmentSolver.assignmentCall
-    functionCallBlocks = FuncCallSolver.inline
-    statements = returnStatement.return_  # consistency TODO: refactor
+    functionCallBlocks = FuncCallSolver.functionCallInline
+    statements = returnStatement.returnStmnt
 
     operation = SyntaxBlocks | assignBlocks | functionCallBlocks | statements
 
-
-class ProgramObjects(OperationsObjects):
-
-    program = pp.Word("program").suppress() + atoms.opening_curly_bracket + pp.OneOrMore(
-        operation) + atoms.closing_curly_bracket
-    self.program.setParseAction(lambda s, l, t: programList(*t))
+    @classmethod
+    def parse(cls, string):
+        return cls.operation.parseString(string).asList()
 
 
-class FunctionDefineParser(SolverBase):
+class ProgramObjects:
 
-    def __init__(self):
-        super().__init__()
-        program = ProgramObjects().parseObject
+    program = pp.Word("program").suppress() + atoms.opening_curly_bracket + \
+        pp.OneOrMore(OperationsObjects.operation) + atoms.closing_curly_bracket
+    program.setParseAction(lambda s, l, t: programList(*t))
 
-        var_assign_line = atoms.variable + atoms.equals + atoms + atoms.semicol
-        var_assign_line.setParseAction(lambda s, l, t: variableOB(*t))
-        var_noassign_line = atoms.variable + atoms.semicol
-        var_noassign_line.setParseAction(
-            lambda s, l, t: variableOB(*t, 0))  # init with 0
-        varline = var_assign_line | var_noassign_line
-        varsblock = pp.Word("vars").suppress(
-        ) + atoms.opening_curly_bracket + pp.OneOrMore(
-            varline) + atoms.closing_curly_bracket
-        varsblock.setParseAction(lambda s, l, t: varList(*t))
 
-        arg = copy.copy(atoms.variable)
-        arg.setParseAction(lambda s, l, t: variableOB(*t, 0))
+class FunctionDefineParser:
 
-        args = atoms.variable + pp.ZeroOrMore(atoms.comma + atoms.variable)
+    var_assign_line = atoms.variable + atoms.equals + atoms.integer + atoms.semicol
+    var_assign_line.setParseAction(lambda s, l, t: variableOB(*t))
 
-        argblock = atoms.lparen + pp.Optional(args) + atoms.rparen
-        argblock.setParseAction(lambda s, l, t: varList(*t))
+    var_noassign_line = atoms.variable + atoms.semicol
+    var_noassign_line.setParseAction(lambda s, l, t: variableOB(*t, 0))
+    # init params that start with nothing to 0 with 0
+    varline = var_assign_line | var_noassign_line
+    varsblock = pp.Word("vars").suppress() + atoms.opening_curly_bracket + \
+        pp.OneOrMore(varline) + atoms.closing_curly_bracket
+    varsblock.setParseAction(lambda s, l, t: varList(*t))
 
-        func_name = copy.copy(atoms.variable)
-        func_name.setParseAction()
+    arg = copy.copy(atoms.variable)
+    arg.setParseAction(lambda s, l, t: variableOB(*t, 0))
 
-        startblock = pp.Word("func ").suppress(
-        ) + atoms.variable + argblock + atoms.opening_curly_bracket
+    args = atoms.variable + pp.ZeroOrMore(atoms.comma + atoms.variable)
 
-        self.function = startblock + \
-            pp.Optional(varsblock, default=None) + \
-            program + atoms.closing_curly_bracket
-        self.function.setParseAction(lambda s, l, t: functionDefineOB(*t))
+    argblock = atoms.lparen + pp.Optional(args) + atoms.rparen
+    argblock.setParseAction(lambda s, l, t: varList(*t))
+
+    startblock = pp.Word("func").suppress() + atoms.variable + \
+        argblock + atoms.opening_curly_bracket
+
+    function = startblock + \
+        pp.Optional(varsblock, default=None) + \
+        ProgramObjects.program + atoms.closing_curly_bracket
+    function.setParseAction(lambda s, l, t: functionDefineOB(*t))
+
+    @classmethod
+    def parse(cls, string):
+        return cls.function.parseString(string).asList()
 
 
 class ProgramSolver:
 
-    def __init__(self):
-        self.functions = pp.OneOrMore(FunctionDefineParser().function)
+    functions = pp.OneOrMore(FunctionDefineParser().function)
 
     def parse(self, string):
         return self.functions.parseString(string).asList()
 
 
 if __name__ == "__main__":
+    JID = 0  # label counter
+    """
     a = OperationsObjects()
 
     print(a.parse("wew();"))
@@ -474,13 +496,20 @@ if __name__ == "__main__":
 
     c = ProgramSolver()
     parsed = c.parse(
-        "func main(wew, lad){vars{wew;}program{while(1<2){callthis();}wew:=3;}}"
-    )[0]  # Type: functionDefineOB
+        "func main(wew, lad){vars{wew;}program{while(1<2){callthis();}wew:=3;}}")[0]
     parsed.parent_own_children()
+    print("######FIRST######")
     print(format_string(str(parsed)))
+    print("######__END__FIRST######")
+    """
 
     second = c.parse(
         "func main(a){program{if(this==that){a:=4;call(a);}while(1<3){print(this, more, that());}}} func call(a,b,c){vars{d;e:=333;f:=3;}program{d:=a*b*c;}}")
+    print("######SECOND######")
     for i in second:
         i.parent_own_children()
         print(format_string(str(i)))
+    print("######__END__SECOND######")
+
+    for i in second:
+        print(i.assemble())
