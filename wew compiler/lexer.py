@@ -5,11 +5,6 @@ from formatter import format_string
 import pyparsing as pp
 
 
-# generates math trees, etc
-
-# this
-
-
 class no_depth_list(list):
     """Class that does not allow any nested lists to be appended, any iterables appended will be unpacked first """
 
@@ -81,7 +76,7 @@ class languageSyntaxOBbase:
 
 class mathOP(languageSyntaxOBbase):
 
-    def __init__(self, *children):  # , op, b):
+    def __init__(self, children):  # , op, b):
         super().__init__(children)
 
     def __str__(self):
@@ -90,8 +85,13 @@ class mathOP(languageSyntaxOBbase):
 
     def assemble(self):
         """
-        Use stack, infix -> postfix ->the stack machine -> return variable in @RET
+        Use stack, infix -> postfix -> the stack machine -> return variable in @RET
         """
+
+        # [x, 'op', y]
+        # [x, 'op', [y, 'op', x]]
+        # [[y, 'op', z], 'op', k]
+
         return no_depth_list(["NOP"])  # TODO: This pls
 
 
@@ -109,11 +109,11 @@ class assignOP(languageSyntaxOBbase):
 
     def assemble(self):
         variable = self.get_variable(self.setter)
-        left_side = self.val.assemble()
-        # output of left_side always ends in @ACC
+        right_side = self.val.assemble()
+        # output of right_side always ends in @ACC
 
         out = no_depth_list()
-        for i in self.assemble_list(left_side):
+        for i in self.assemble_list(right_side):
             out << i
         out << f"MOV @ACC {variable}"
 
@@ -211,8 +211,6 @@ class ifTypeOB(languageSyntaxOBbase):
         global JID
 
         out = no_depth_list()
-        print(self.comp.left)
-        print(self.comp.right)
         out << f"CMP {self.get_variable(self.comp.left)} {self.get_variable(self.comp.right)}"
         out << f"{self.comp.comp} jump_end_{JID}"
         for i in self.assemble_list(self.codeblock):
@@ -248,19 +246,15 @@ class functionCallOB(languageSyntaxOBbase):
             self, ", ".join("{}".format(str(i)) for i in self.children))
 
 
-class varList(languageSyntaxOBbase):
+def varList(*vars):
 
-    def __init__(self, *children):
-        super().__init__(*children)
-
-    def assemble(self):
-        return no_depth_list(["NOP"])
+    return vars
 
 
 class functionDefineOB(languageSyntaxOBbase):
 
-    def __init__(self, name, params, vars_, children):
-        super().__init__(children)
+    def __init__(self, name, params, vars_, program):
+        super().__init__(program)
         self.name = name
         self.params = params
         self.vars_ = vars_
@@ -295,20 +289,39 @@ class functionDefineOB(languageSyntaxOBbase):
         print(f"getting variable {VarName}, t: {type(VarName)}")
         ret = None
         if self.params:
-            if VarName in self.params.children:
-                return "[@lstk+{}]".format(self.params.children[::-1].index(VarName) + 1)
+            if VarName in self.params:
+                return "[@lstk+{}]".format(self.params[::-1].index(VarName) + 1)
         elif self.vars_:
-            if VarName in self.vars_.children:
+            if VarName in self.vars_:
                 return "[@lstk-{}]".format(
-                    self.vars_.children.index(VarName) + 1)
+                    self.vars_.index(VarName) + 1)
         else:
             raise ParseException(
                 "Attempt to access variable not in scope. Current function: {}, variable: {}".
                 format(self.name, VarName))
 
-        @property
-        def num_params(self):
-            return len(self.params)
+    @property
+    def num_params(self):
+        return len(self.params)
+
+    def assemble(self):
+        out = no_depth_list()
+        out << f"_{self.name} NOP"
+        out << "PUSHSTK @lstk"  # save previous stack pointer
+        out << "MOV [@stk+0] @lstk"  # copy current stack pointer to @lstk
+        for i in self.vars_:  # insert our function local vars
+            out << f"PUSHSTK #{i.initial}"
+        for i in self.assemble_list(self.children):
+            out << i  # insert function code
+        out << "MOV #0 @RET"  # setup fall through return function
+        out << "MOV @LSTK @STK"
+        out << "MOV [@STK+0] @LSTK"
+        out << "MOV @STK @ACC"
+        out << f"ADD #{self.num_params}"
+        out << "MOV @ACC @STK"
+        out << "RET"
+
+        return out
 
 
 class returnStmtOB(languageSyntaxOBbase):
@@ -331,9 +344,11 @@ class returnStmtOB(languageSyntaxOBbase):
         out << "MOV @LSTK @STK"
         out << "MOV [@STK+0] @LSTK"
         out << "MOV @STK @ACC"
-        out << f"ADD {self.num_params}"
+        out << f"ADD #{self.num_params}"
         out << "MOV @ACC @STK"
         out << "RET"
+
+        return out
 
 
 class atoms:
@@ -372,11 +387,10 @@ class AssignmentSolver:
     addsub = pp.oneOf("+ -")
     muldiv = pp.oneOf("* /")
 
-    oplist = [(muldiv, 2, pp.opAssoc.RIGHT), (addsub, 2, pp.opAssoc.RIGHT)]
+    oplist = [(muldiv, 2, pp.opAssoc.LEFT), (addsub, 2, pp.opAssoc.LEFT)]
 
-    expr = pp.operatorPrecedence(
-        operator,
-        oplist).setParseAction(lambda s, l, t: mathOP(t.asList()))
+    expr = pp.infixNotation(
+        operator, oplist).setParseAction(lambda s, l, t: mathOP(t.asList()))
 
     assign = atoms.variable + atoms.equals + expr
     assignmentCall = assign + atoms.semicol
@@ -504,7 +518,7 @@ if __name__ == "__main__":
                         }""")[0])))
 
     program1 = """
-    func cmp(this, that){
+    func comparenums(this, that){
         vars {
             a := 2;
         }
@@ -524,4 +538,4 @@ if __name__ == "__main__":
     parsed.parent_own_children()
 
     print(format_string(str(parsed)))
-    print(parsed.assemble())
+    print("\n".join(parsed.assemble()))
