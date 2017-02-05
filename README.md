@@ -19,9 +19,9 @@ Registers start with `@` and are accessed with their name directly (for example:
 ```
 CUR  < current instruction register (no reason to access directly use jump command to modify).
 ACC  < accumulator, arithmetic operations are done to this register.
-RAX  < general purpose register (ideally store function returns here)
+RAX  < general purpose register
 EAX  < general purpose register
-RET  < function jump return
+RET  < return value from functions (also general purpose)
 CMP  < last comparison register. (unlike the others, this contains a string, dont touch it and you'll be fine)
 STK  < current stack position
 LSTK < temporary stack position (used for calling functions)
