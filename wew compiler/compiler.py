@@ -4,6 +4,8 @@ from formatter import format_string
 
 import pyparsing as pp
 
+JID = 0  # label counter
+
 
 class no_depth_list(list):
     """Class that does not allow any nested lists to be appended, any iterables appended will be unpacked first """
@@ -282,9 +284,8 @@ def languageSyntaxOB(type_, *children):
 class functionCallOB(languageSyntaxOBbase):
 
     def __init__(self, functionName, children):
-        super().__init__()
+        super().__init__(children[0])
         self.functionName = functionName
-        self.children = children
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.functionName}> <args: {1}>>".format(
@@ -294,24 +295,34 @@ class functionCallOB(languageSyntaxOBbase):
         vars_ = no_depth_list()
         stack_pos = 0
         out = no_depth_list()
-        for i in self.children:
+        print(f"functioncallOB_vals: {self.children}")
+        for i in self.children[0]:
+            print(f"valinst: {i}")
             if isinstance(i, int):
-                vars_ << {"val", f"#{i}"}
+                vars_ << ("val", f"#{i}")
             elif isinstance(i, str):
-                vars_ << {"var", self.get_variable(i)}
+                vars_ << ("var", self.get_variable(i))
             elif isinstance(i, mathOP):
                 for k in i.assemble():
                     out << k
                 out << "PUSHSTK @ACC"
-                vars_ << {"stpos": stack_pos}
-                stack_pos += 1  # TODO:
+                vars_ << ("stpos", stack_pos)
+                stack_pos += 1
+            elif isinstance(i, functionCallOB):
+                for k in i.assemble():
+                    out << k
+                out << "PUSHSTK @RET"  # functions end up in the ret register
+                vars_ << ("stpos", stack_pos)
+                stack_pos += 1
 
         # decide on vars
+        print(f"VARS FOR FUNC CALL: {vars_}")
 
         assembled_vars = no_depth_list()
         for j, k in vars_:
+            print(f"ass: {j}: {k}")
             if j == "stpos":
-                assembled_vars << f"[@LSTK-{stack_pos+k}]"
+                assembled_vars << f"[@STK+{stack_pos+k}]"
             else:
                 assembled_vars << k
 
@@ -320,7 +331,10 @@ class functionCallOB(languageSyntaxOBbase):
                 #    Turn list of vars_ into: `CALL arg1 [arg2 [...]]
                 #
                 #
-        out << "CALL {}".format(" ".join(assembled_vars))
+        out << "CALL {} {}".format(self.functionName, " ".join(assembled_vars))
+        out << "MOV @STK @ACC"  # we need to clean up our stack located arguments
+        out << f"ADD #{stack_pos}"
+        out << "MOV @ACC @STK"
         print(f"FUNCcOP: {out}")
         return out
 
@@ -355,8 +369,9 @@ class functionDefineOB(languageSyntaxOBbase):
         }
 
 
-        stack; |var| position relative to @lstk, position in var/ param list:
+        stack; |var| position relative to @LSTK, position in var/ param list:
 
+        |return address| + 4
         |a|  + 3, 0
         |b|  + 2, 1
         |c|  + 1, 2
@@ -369,10 +384,10 @@ class functionDefineOB(languageSyntaxOBbase):
         ret = None
         if self.params:
             if VarName in self.params:
-                return "[@lstk+{}]".format(self.params[::-1].index(VarName) + 1)
+                return "[@LSTK+{}]".format(self.params[::-1].index(VarName) + 1)
         if self.vars_:
             if VarName in self.vars_:
-                return "[@lstk-{}]".format(
+                return "[@LSTK-{}]".format(
                     self.vars_.index(VarName) + 1)
         else:
             print(f"GETVAR FAILED: {VarName}")
@@ -385,20 +400,24 @@ class functionDefineOB(languageSyntaxOBbase):
         return len(self.params)
 
     def assemble(self):
+        # functions are jumped to with stack looking like: [ret, a, b, c]
+        # we push lstk, then the function args
         out = no_depth_list()
         out << f"_{self.name} NOP"
-        out << "PUSHSTK @lstk"  # save previous stack pointer
-        out << "MOV [@stk+0] @lstk"  # copy current stack pointer to @lstk
+        # save previous base pointer [ret, a, b, c, lstk]
+        out << "PUSHSTK @LSTK"
+        out << "MOV @STK @LSTK"  # copy current stack pointer to base pointer
         if self.vars_:
             for i in self.vars_:  # insert our function local vars
                 out << f"PUSHSTK #{i.initial}"
         for i in self.assemble_list(self.children):
             out << i  # insert function code
         out << "MOV #0 @RET"  # setup fall through return function
-        out << "MOV @LSTK @STK"
+        out << "MOV @LSTK @STK"  # pull stack pointer back to base pointer
+        # restore base pointer of previous function
         out << "MOV [@STK+0] @LSTK"
         out << "MOV @STK @ACC"
-        out << f"ADD #{self.num_params}"
+        out << f"ADD #{self.num_params+1}"
         out << "MOV @ACC @STK"
         out << "RET"
 
@@ -425,7 +444,7 @@ class returnStmtOB(languageSyntaxOBbase):
         out << "MOV @LSTK @STK"
         out << "MOV [@STK+0] @LSTK"
         out << "MOV @STK @ACC"
-        out << f"ADD #{self.num_params}"
+        out << f"ADD #{self.num_params+1}"
         out << "MOV @ACC @STK"
         out << "RET"
 
@@ -562,12 +581,12 @@ class ProgramSolver:
 
     functions = pp.OneOrMore(FunctionDefineParser().function)
 
-    def parse(self, string):
-        return self.functions.parseString(string).asList()
+    @classmethod
+    def parse(cls, string):
+        return cls.functions.parseString(string).asList()
 
 
 if __name__ == "__main__":
-    JID = 0  # label counter
     a = OperationsObjects()
 
     print(a.parse("wew();"))
@@ -620,7 +639,6 @@ if __name__ == "__main__":
         }
     }
     """
-    # TODO: allow no vars, fix num_params in return statement
     min_ = program1.strip("\n")
     for i in min_:
         print(min_)
@@ -632,3 +650,17 @@ if __name__ == "__main__":
 
     for i in parsed:
         print("\n".join(i.assemble()))
+
+
+def load_parse(fname):
+    with open(fname) as f:
+        program = f.read()
+    functions = ProgramSolver.parse(program.strip("\n"))
+
+    compiled = ["call main", "halt"]
+    for i in functions:
+        i.parent_own_children()
+        compiled += i.assemble()
+
+    with open(f"{fname}.compiled", "w+") as f:
+        f.writelines("\n".join(compiled))

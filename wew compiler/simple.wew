@@ -1,0 +1,14 @@
+func justreturn(a) {
+  program {
+    return a;
+  }
+}
+
+func main() {
+  vars {
+    b := 2;
+  }
+  program {
+    b := justreturn(b);
+  }
+}

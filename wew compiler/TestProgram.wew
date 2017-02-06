@@ -1,0 +1,30 @@
+func addtwo(a, b) {
+  program {
+    a := a + b;
+    return a;
+  }
+}
+
+func comparenums(this, that){
+  vars {
+    a := 2;
+  }
+  program {
+    a := addtwo(a, a);
+    this := a * this;
+    if (this<that) {
+      return that;
+    }
+    return this;
+  }
+}
+
+
+func main(){
+  vars {
+    a;
+  }
+  program {
+    a := comparenums(comparenums(1, 2), 10);
+  }
+}

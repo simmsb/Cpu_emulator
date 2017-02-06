@@ -1,9 +1,11 @@
 import re
+import traceback
 
 from .memory import *
 from .opcodes import *
 
 DEBUG = False
+INTERACTIVE = True
 
 
 class Registers:
@@ -86,6 +88,12 @@ class Cpu:
                 print("Operands were: {}".format(operands))
                 print("Memory is: {}".format(self.memory.cells))
             self.instruction_set.run_encoded(opcode, *operands)
+            print(f"stack: {self.memory.cells[self.registers['stk']:self.memory.size]}")
+            print(f"stk: {self.registers['stk']}")
+            print(f"lstk: {self.registers['lstk']}")
+            print(f"cur: {self.registers['cur']}")
+            print(f"ret: {self.registers['ret']}")
+            print(f"current command: {self.instruction_set.encoded_commands[opcode].__name__}\n\n")
         except CpuStoppedCall as e:
             raise e  # re-raise here so we can ignore it
         except Exception as e:
@@ -93,7 +101,7 @@ class Cpu:
             print("Last instruction was: {}".format(
                 self.instruction_set.encoded_commands[opcode].__name__))
             print("operands were: {}".format(operands))
-            print("exception was: {}".format(e))
+            print("exception was: {}".format(traceback.format_exc()))
             raise CpuStoppedCall("Computer Crashed Halt")
 
     def interpret_write_address(self, string):
@@ -103,7 +111,7 @@ class Cpu:
 
         # allow for in-place addition/ subtraction
         in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")
-        function_match = re.compile("(?![^+-])[+=](?=[^+-])")
+        function_match = re.compile("(?![^+-])[+-](?=[^+-])")
 
         function_map = {
             "+": (lambda a, b: interpret_memory_location(a) + int(b)),
@@ -116,7 +124,7 @@ class Cpu:
 
         multiples = in_place_add.search(string)
         if multiples:
-            return function_map[function_match.search(multiples.group()).group()](*re.split(r"[+=]", multiples.group()))
+            return function_map[function_match.search(multiples.group()).group()](*re.split(r"[+-]", multiples.group()))
         else:
             return int(string)
 
@@ -130,7 +138,7 @@ class Cpu:
 
         # allow for in-place addition/ subtraction
         in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")
-        function_match = re.compile("(?![^+-])[+=](?=[^+-])")
+        function_match = re.compile("(?![^+-])[+-](?=[^+-])")
 
         function_map = {
             "+": (lambda a, b: interpret(a) + int(b)),
@@ -146,8 +154,10 @@ class Cpu:
                 interpret_memory_location(location_string)
 
         multiples = in_place_add.search(string)
+        if DEBUG:
+            print(f"multiples: {multiples}")
         if multiples:
-            return self.memory[function_map[function_match.search(multiples.group()).group()](*re.split(r"[+=]", multiples.group()))]
+            return self.memory[function_map[function_match.search(multiples.group()).group()](*re.split(r"[+-]", multiples.group()))]
         else:
             return interpret(string)
 
@@ -156,7 +166,9 @@ class Cpu:
             try:
                 current_instruction = self.memory[self.registers["cur"]]
                 if DEBUG:
-                    print("cur is: {}".format(self.registers["cur"]))
+                    print(f"cur is: {self.registers['cur']}")
+                    print(f"STK is: {self.registers['stk']}")
+                    print(f"LSTK is: {self.registers['lstk']}")
                 self.registers["cur"] += 1  # increment counter
                 self._decode_numeric_command(current_instruction)
             except CpuStoppedCall as e:
