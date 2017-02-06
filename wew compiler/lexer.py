@@ -101,12 +101,15 @@ class mathOP(languageSyntaxOBbase):
             if isinstance(expr, (int, str)):
                 return expr
 
+            if isinstance(expr, tuple):
+                expr = list(expr)
+
             while expr:
                 i = expr.pop()
                 if isinstance(i, list):
                     for i in parse(i):
                         resolved.append(i)
-                elif isinstance(i, mathop):
+                elif isinstance(i, mathOP):
                     for i in parse(i.children):
                         resolved.append(i)
                 elif i in ["+", "-", "*", "/"]:
@@ -156,10 +159,9 @@ class assignOP(languageSyntaxOBbase):
         # output of right_side always ends in @ACC
 
         out = no_depth_list()
-        for i in self.assemble_list(right_side):
+        for i in right_side:
             out << i
         out << f"MOV @ACC {variable}"
-
         return out
 
 
@@ -294,19 +296,33 @@ class functionCallOB(languageSyntaxOBbase):
         out = no_depth_list()
         for i in self.children:
             if isinstance(i, int):
-                vars_ << f"#{i}"
+                vars_ << {"val", f"#{i}"}
             elif isinstance(i, str):
-                vars_ << self.get_variable(i)
+                vars_ << {"var", self.get_variable(i)}
             elif isinstance(i, mathOP):
                 for k in i.assemble():
                     out << k
-                vars_ << {"stackPosition": stack_pos}
+                out << "PUSHSTK @ACC"
+                vars_ << {"stpos": stack_pos}
                 stack_pos += 1  # TODO:
+
+        # decide on vars
+
+        assembled_vars = no_depth_list()
+        for j, k in vars_:
+            if j == "stpos":
+                assembled_vars << f"[@LSTK-{stack_pos+k}]"
+            else:
+                assembled_vars << k
+
                 #
                 #
                 #    Turn list of vars_ into: `CALL arg1 [arg2 [...]]
                 #
                 #
+        out << "CALL {}".format(" ".join(assembled_vars))
+        print(f"FUNCcOP: {out}")
+        return out
 
 
 def varList(*vars):
@@ -354,11 +370,12 @@ class functionDefineOB(languageSyntaxOBbase):
         if self.params:
             if VarName in self.params:
                 return "[@lstk+{}]".format(self.params[::-1].index(VarName) + 1)
-        elif self.vars_:
+        if self.vars_:
             if VarName in self.vars_:
                 return "[@lstk-{}]".format(
                     self.vars_.index(VarName) + 1)
         else:
+            print(f"GETVAR FAILED: {VarName}")
             raise ParseException(
                 "Attempt to access variable not in scope. Current function: {}, variable: {}".
                 format(self.name, VarName))
@@ -372,8 +389,9 @@ class functionDefineOB(languageSyntaxOBbase):
         out << f"_{self.name} NOP"
         out << "PUSHSTK @lstk"  # save previous stack pointer
         out << "MOV [@stk+0] @lstk"  # copy current stack pointer to @lstk
-        for i in self.vars_:  # insert our function local vars
-            out << f"PUSHSTK #{i.initial}"
+        if self.vars_:
+            for i in self.vars_:  # insert our function local vars
+                out << f"PUSHSTK #{i.initial}"
         for i in self.assemble_list(self.children):
             out << i  # insert function code
         out << "MOV #0 @RET"  # setup fall through return function
@@ -581,11 +599,20 @@ if __name__ == "__main__":
                         }""")[0])))
 
     program1 = """
+    func addtwo(a, b) {
+        program {
+            a := a + b;
+            return a;
+        }
+    }
+
     func comparenums(this, that){
         vars {
             a := 2;
         }
         program {
+            a := addtwo(a, a);
+            this := a * this;
             if (this<that) {
                 return that;
             }
@@ -595,10 +622,13 @@ if __name__ == "__main__":
     """
     # TODO: allow no vars, fix num_params in return statement
     min_ = program1.strip("\n")
-    print(min_)
+    for i in min_:
+        print(min_)
 
-    parsed = c.parse(min_)[0]
-    parsed.parent_own_children()
+    parsed = c.parse(min_)
+    for i in parsed:
+        i.parent_own_children()
+        print(format_string(str(i)))
 
-    print(format_string(str(parsed)))
-    print("\n".join(parsed.assemble()))
+    for i in parsed:
+        print("\n".join(i.assemble()))
