@@ -88,11 +88,54 @@ class mathOP(languageSyntaxOBbase):
         Use stack, infix -> postfix -> the stack machine -> return variable in @RET
         """
 
-        # [x, 'op', y]
-        # [x, 'op', [y, 'op', x]]
-        # [[y, 'op', z], 'op', k]
+        asm_map = {
+            "+": "ADD",
+            "-": "SUB",
+            "*": "MUL",
+            "/": "DIV"
+        }
 
-        return no_depth_list(["NOP"])  # TODO: This pls
+        def parse(expr):
+            resolved = []
+
+            if isinstance(expr, (int, str)):
+                return expr
+
+            while expr:
+                i = expr.pop()
+                if isinstance(i, list):
+                    for i in parse(i):
+                        resolved.append(i)
+                elif isinstance(i, mathop):
+                    for i in parse(i.children):
+                        resolved.append(i)
+                elif i in ["+", "-", "*", "/"]:
+                    next_ = parse(expr.pop())
+                    prev = resolved.pop()
+                    resolved += next_
+                    resolved.append(prev)
+                    resolved.append(i)
+                else:  # string or int
+                    resolved.append(i)
+            return resolved
+
+        out = no_depth_list()
+        for i in parse(self.children):
+            if isinstance(i, int):
+                out << f"PUSHSTK #{i}"
+            elif i in ["+", "-", "*", "/"]:
+                out << "POPSTK @ACC"
+                out << "POPSTK @EAX"
+                out << f"{asm_map[i]} @EAX"
+                out << "PUSHSTK @ACC"
+            elif isinstance(i, str):
+                out << f"PUSHSTK {self.get_variable(i)}"
+            elif isinstance(i, functionCallOB):
+                for i in i.assemble():
+                    out << i
+                out << "PUSHSTK @RET"
+        out << "POPSTK @ACC"
+        return out
 
 
 class assignOP(languageSyntaxOBbase):
@@ -244,6 +287,26 @@ class functionCallOB(languageSyntaxOBbase):
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.functionName}> <args: {1}>>".format(
             self, ", ".join("{}".format(str(i)) for i in self.children))
+
+    def assemble(self):
+        vars_ = no_depth_list()
+        stack_pos = 0
+        out = no_depth_list()
+        for i in self.children:
+            if isinstance(i, int):
+                vars_ << f"#{i}"
+            elif isinstance(i, str):
+                vars_ << self.get_variable(i)
+            elif isinstance(i, mathOP):
+                for k in i.assemble():
+                    out << k
+                vars_ << {"stackPosition": stack_pos}
+                stack_pos += 1  # TODO:
+                #
+                #
+                #    Turn list of vars_ into: `CALL arg1 [arg2 [...]]
+                #
+                #
 
 
 def varList(*vars):
