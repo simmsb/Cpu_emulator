@@ -88,12 +88,13 @@ class Cpu:
                 print("Operands were: {}".format(operands))
                 print("Memory is: {}".format(self.memory.cells))
             self.instruction_set.run_encoded(opcode, *operands)
-            print(f"stack: {self.memory.cells[self.registers['stk']:self.memory.size]}")
-            print(f"stk: {self.registers['stk']}")
-            print(f"lstk: {self.registers['lstk']}")
-            print(f"cur: {self.registers['cur']}")
-            print(f"ret: {self.registers['ret']}")
-            print(f"current command: {self.instruction_set.encoded_commands[opcode].__name__}\n\n")
+            if DEBUG:
+                print(f"stack: {self.memory.cells[self.registers['stk']:self.memory.size]}")
+                print(f"stk: {self.registers['stk']}")
+                print(f"lstk: {self.registers['lstk']}")
+                print(f"cur: {self.registers['cur']}")
+                print(f"ret: {self.registers['ret']}")
+                print(f"current command: {self.instruction_set.encoded_commands[opcode].__name__}\n\n")
         except CpuStoppedCall as e:
             raise e  # re-raise here so we can ignore it
         except Exception as e:
@@ -226,6 +227,7 @@ class Compiler:
 
             if not self.instruction_set.encode_name(op) and not op.startswith("_"):
                 labels[op] = len(labels)  # next value is always
+                print(f"split: {split}")
                 label_values.append(int(split[1]) if len(split) > 1 else 0)
                 temporary_commands.remove(c)  # cut from list
 

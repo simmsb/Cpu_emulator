@@ -1,0 +1,16 @@
+func main() {
+    vars {
+        a := 0;
+        b := 1;
+        temp;
+        count;
+    }
+    program {
+        while (count<10) {
+            temp := a + b;
+            a := b;
+            b := temp;
+            count := count + 1;
+        }
+    }
+}

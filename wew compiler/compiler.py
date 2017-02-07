@@ -43,6 +43,8 @@ class languageSyntaxOBbase:
 
     def get_variable(self, VarName):
         """Finds stack position of a variable, bubbles up to the parent function"""
+        if isinstance(VarName, int):
+            return f"#{VarName}"
         if not self.parent:
             raise ParseException(
                 "object: {} attempted to gain variable {}, but it has no parent".
@@ -79,6 +81,7 @@ class languageSyntaxOBbase:
 class mathOP(languageSyntaxOBbase):
 
     def __init__(self, children):  # , op, b):
+        print(f"Mathop: {children}")
         super().__init__(children)
 
     def __str__(self):
@@ -98,9 +101,11 @@ class mathOP(languageSyntaxOBbase):
         }
 
         def parse(expr):
+            print(f"parsing: {expr}")
             resolved = []
 
             if isinstance(expr, (int, str)):
+                print(f"ret str: {expr}")
                 return expr
 
             if isinstance(expr, tuple):
@@ -116,6 +121,8 @@ class mathOP(languageSyntaxOBbase):
                         resolved.append(i)
                 elif i in ["+", "-", "*", "/"]:
                     next_ = parse(expr.pop())
+                    if isinstance(next_, str):
+                        next_ = [next_]
                     prev = resolved.pop()
                     resolved += next_
                     resolved.append(prev)
@@ -125,7 +132,9 @@ class mathOP(languageSyntaxOBbase):
             return resolved
 
         out = no_depth_list()
-        for i in parse(self.children):
+        parsed = parse(self.children)
+        print(parsed)
+        for i in parsed:
             if isinstance(i, int):
                 out << f"PUSHSTK #{i}"
             elif i in ["+", "-", "*", "/"]:
@@ -238,7 +247,7 @@ class whileTypeOB(languageSyntaxOBbase):
         out << f"{self.comp.comp} jump_end_{JID}"
         for i in self.assemble_list(self.codeblock):
             out << i
-        out << f"JMP jump_start_{JID}"
+        out << f"JUMP jump_start_{JID}"
         out << f"_jump_end_{JID} NOP"
 
         JID += 1
