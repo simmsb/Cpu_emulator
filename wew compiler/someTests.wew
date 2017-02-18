@@ -1,0 +1,26 @@
+func double(a) {
+  program {
+    a := a*2;
+    return a;
+  }
+}
+
+func test(a, b, c, d) {
+  vars {
+    t;
+  }
+  program {
+    t := a*b*c*d;
+    a := double(double(t));
+    return a;
+  }
+}
+
+func main() {
+  vars {
+    a;
+  }
+  program {
+    a := test(1,2,3,4);
+  }
+}

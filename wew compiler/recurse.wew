@@ -1,0 +1,23 @@
+func factorial(a) {
+  vars {
+    t;
+  }
+  program {
+    if (a <= 0) {
+      return 1;
+    }
+    t := a-1;
+    t := factorial(t);
+    t := t * a;
+    return t;
+  }
+}
+
+func main() {
+  vars {
+    t;
+  }
+  program {
+    t := factorial(4);
+  }
+}

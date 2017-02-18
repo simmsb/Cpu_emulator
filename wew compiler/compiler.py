@@ -1,10 +1,16 @@
 import copy
-import traceback
 from formatter import format_string
 
 import pyparsing as pp
 
 JID = 0  # label counter
+
+DEBUG = True
+
+
+def debug(*args, **kwargs):
+    if DEBUG:
+        print(*args, **kwargs)
 
 
 class no_depth_list(list):
@@ -27,7 +33,7 @@ class languageSyntaxOBbase:
 
     def parent_own_children(self):
         """Initiates filling of child parents (for codegen callbacks)"""
-        # print("{0} parenting children: {0.children}".format(self))
+        # debug("{0} parenting children: {0.children}".format(self))
         self.parent_children(self.children)
 
     def parent_children(self, *children):
@@ -81,7 +87,7 @@ class languageSyntaxOBbase:
 class mathOP(languageSyntaxOBbase):
 
     def __init__(self, children):  # , op, b):
-        print(f"Mathop: {children}")
+        debug(f"Mathop: {children}")
         super().__init__(children)
 
     def __str__(self):
@@ -101,11 +107,11 @@ class mathOP(languageSyntaxOBbase):
         }
 
         def parse(expr):
-            print(f"parsing: {expr}")
+            debug(f"parsing: {expr}")
             resolved = []
 
             if isinstance(expr, (int, str)):
-                print(f"ret str: {expr}")
+                debug(f"ret str: {expr}")
                 return expr
 
             if isinstance(expr, tuple):
@@ -133,7 +139,7 @@ class mathOP(languageSyntaxOBbase):
 
         out = no_depth_list()
         parsed = parse(self.children)
-        print(parsed)
+        debug(parsed)
         for i in parsed:
             if isinstance(i, int):
                 out << f"PUSHSTK #{i}"
@@ -304,9 +310,9 @@ class functionCallOB(languageSyntaxOBbase):
         vars_ = no_depth_list()
         stack_pos = 0
         out = no_depth_list()
-        print(f"functioncallOB_vals: {self.children}")
+        debug(f"functioncallOB_vals: {self.children}")
         for i in self.children[0]:
-            print(f"valinst: {i}")
+            debug(f"valinst: {i}")
             if isinstance(i, int):
                 vars_ << ("val", f"#{i}")
             elif isinstance(i, str):
@@ -325,11 +331,11 @@ class functionCallOB(languageSyntaxOBbase):
                 stack_pos += 1
 
         # decide on vars
-        print(f"VARS FOR FUNC CALL: {vars_}")
+        debug(f"VARS FOR FUNC CALL: {vars_}")
 
         assembled_vars = no_depth_list()
         for j, k in vars_:
-            print(f"ass: {j}: {k}")
+            debug(f"ass: {j}: {k}")
             if j == "stpos":
                 assembled_vars << f"[@STK+{stack_pos+k}]"
             else:
@@ -344,7 +350,7 @@ class functionCallOB(languageSyntaxOBbase):
         out << "MOV @STK @ACC"  # we need to clean up our stack located arguments
         out << f"ADD #{stack_pos}"
         out << "MOV @ACC @STK"
-        print(f"FUNCcOP: {out}")
+        debug(f"FUNCcOP: {out}")
         return out
 
 
@@ -389,7 +395,7 @@ class functionDefineOB(languageSyntaxOBbase):
         |e|  - 2, 1
 
         '''
-        print(f"getting variable {VarName}, t: {type(VarName)}")
+        debug(f"getting variable {VarName}, t: {type(VarName)}")
         ret = None
         if self.params:
             if VarName in self.params:
@@ -399,7 +405,7 @@ class functionDefineOB(languageSyntaxOBbase):
                 return "[@LSTK-{}]".format(
                     self.vars_.index(VarName) + 1)
         else:
-            print(f"GETVAR FAILED: {VarName}")
+            debug(f"GETVAR FAILED: {VarName}")
             raise ParseException(
                 "Attempt to access variable not in scope. Current function: {}, variable: {}".
                 format(self.name, VarName))
@@ -436,7 +442,7 @@ class functionDefineOB(languageSyntaxOBbase):
 class returnStmtOB(languageSyntaxOBbase):
 
     def __init__(self, returnVar):
-        super().__init__()
+        super().__init__(returnVar)
         self.returnVar = returnVar
 
     def assemble(self):
@@ -449,7 +455,10 @@ class returnStmtOB(languageSyntaxOBbase):
             add <number of vars> to @STK (push stack above pointer)
             call RET
         """
-        out << f"MOV {self.get_variable(self.returnVar)} @RET"
+        if isinstance(self.returnVar, str):  # assume variable name
+            out << f"MOV {self.get_variable(self.returnVar)} @RET"
+        elif isinstance(self.returnVar, int):
+            out << f"MOV #{self.returnVar} @RET"
         out << "MOV @LSTK @STK"
         out << "MOV [@STK+0] @LSTK"
         out << "MOV @STK @ACC"
@@ -476,6 +485,12 @@ class atoms:
 
     comparison = pp.oneOf("== != > < >= <=")
 
+    addsub = pp.oneOf("+ -")
+    muldiv = pp.oneOf("* /")
+
+    oplist = [(muldiv, 2, pp.opAssoc.LEFT),
+              (addsub, 2, pp.opAssoc.LEFT)]
+
 
 class FuncCallSolver:
     functionCall = pp.Forward()
@@ -493,13 +508,8 @@ class FuncCallSolver:
 class AssignmentSolver:
     operator = FuncCallSolver.functionCall | atoms.operand
 
-    addsub = pp.oneOf("+ -")
-    muldiv = pp.oneOf("* /")
-
-    oplist = [(muldiv, 2, pp.opAssoc.LEFT), (addsub, 2, pp.opAssoc.LEFT)]
-
     expr = pp.infixNotation(
-        operator, oplist).setParseAction(lambda s, l, t: mathOP(t.asList()))
+        operator, atoms.oplist).setParseAction(lambda s, l, t: mathOP(t.asList()))
 
     assign = atoms.variable + atoms.equals + expr
     assignmentCall = assign + atoms.semicol
@@ -508,8 +518,8 @@ class AssignmentSolver:
 
 class returnStatement:
 
-    returnStmnt = (pp.Word("return").suppress() +
-                   atoms.variable + atoms.semicol).setParseAction(lambda t: returnStmtOB(*t))
+    returnStmnt = (pp.Keyword("return").suppress() +
+                   atoms.operand + atoms.semicol).setParseAction(lambda t: returnStmtOB(*t))
 
 
 class SyntaxBlockParser:
@@ -523,7 +533,7 @@ class SyntaxBlockParser:
         atoms.comparison + atoms.operand + atoms.rparen
     condition.setParseAction(lambda s, l, t: comparisonOB(*t))
 
-    blockTypes = pp.oneOf("while if")
+    blockTypes = pp.Keyword("if") | pp.Keyword("while")
 
     syntaxBlock << blockTypes + condition + \
         atoms.opening_curly_bracket + Syntaxblk + atoms.closing_curly_bracket
@@ -547,7 +557,7 @@ class OperationsObjects:
 
 class ProgramObjects:
 
-    program = pp.Word("program").suppress() + atoms.opening_curly_bracket + \
+    program = pp.Keyword("program").suppress() + atoms.opening_curly_bracket + \
         pp.OneOrMore(OperationsObjects.operation) + atoms.closing_curly_bracket
     program.setParseAction(lambda s, l, t: programList(*t))
 
@@ -561,7 +571,7 @@ class FunctionDefineParser:
     var_noassign_line.setParseAction(lambda s, l, t: variableOB(*t, 0))
     # init params that start with nothing to 0 with 0
     varline = var_assign_line | var_noassign_line
-    varsblock = pp.Word("vars").suppress() + atoms.opening_curly_bracket + \
+    varsblock = pp.Keyword("vars").suppress() + atoms.opening_curly_bracket + \
         pp.OneOrMore(varline) + atoms.closing_curly_bracket
     varsblock.setParseAction(lambda s, l, t: varList(*t))
 
@@ -573,7 +583,7 @@ class FunctionDefineParser:
     argblock = atoms.lparen + pp.Optional(args) + atoms.rparen
     argblock.setParseAction(lambda s, l, t: varList(*t))
 
-    startblock = pp.Word("func").suppress() + atoms.variable + \
+    startblock = pp.Keyword("func").suppress() + atoms.variable + \
         argblock + atoms.opening_curly_bracket
 
     function = startblock + \
@@ -588,88 +598,33 @@ class FunctionDefineParser:
 
 class ProgramSolver:
 
-    functions = pp.OneOrMore(FunctionDefineParser().function)
+    functions = pp.OneOrMore(FunctionDefineParser.function)
 
     @classmethod
     def parse(cls, string):
         return cls.functions.parseString(string).asList()
 
 
-if __name__ == "__main__":
-    a = OperationsObjects()
-
-    print(a.parse("wew();"))
-    print(a.parse("wew(lad, ayy, lmao);"))
-    print(a.parse("wew(lad);"))
-    print(a.parse("wew(lad(ayy), ayy);"))
-    print(a.parse("wew(lad(ayy(lmao(test))));"))
-    print(a.parse("wew(lad(ayy()));"))
-
-    print(a.parse("A := A + B - C;"))
-    print(a.parse("A := func() + c * 5;"))
-
-    print(
-        a.parse("while(a>b){wew();lad(wew());if(a<b){dothis();}}}"))
-
-    b = FunctionDefineParser()
-    c = ProgramSolver()
-    print(format_string(
-        str(c.parse("""func wew(a,b,c){
-                            vars {
-                                a := 2;
-                                b := 4;
-                            }
-                            program {
-                                if(this<that){
-                                call();
-                                }
-                            }
-                        }""")[0])))
-
-    program1 = """
-    func addtwo(a, b) {
-        program {
-            a := a + b;
-            return a;
-        }
-    }
-
-    func comparenums(this, that){
-        vars {
-            a := 2;
-        }
-        program {
-            a := addtwo(a, a);
-            this := a * this;
-            if (this<that) {
-                return that;
-            }
-            return this;
-        }
-    }
-    """
-    min_ = program1.strip("\n")
-    for i in min_:
-        print(min_)
-
-    parsed = c.parse(min_)
-    for i in parsed:
-        i.parent_own_children()
-        print(format_string(str(i)))
-
-    for i in parsed:
-        print("\n".join(i.assemble()))
-
-
 def load_parse(fname):
     with open(fname) as f:
         program = f.read()
-    functions = ProgramSolver.parse(program.strip("\n"))
+        functions = ProgramSolver.parse(program)  # .strip("\n"))
 
-    compiled = ["call main", "halt"]
-    for i in functions:
-        i.parent_own_children()
-        compiled += i.assemble()
+        compiled = ["call main", "halt"]
+        debug(functions)
+        for i in functions:
+            i.parent_own_children()
+            compiled += i.assemble()
+            print(format_string(str(i)))
 
-    with open(f"{fname}.compiled", "w+") as f:
-        f.writelines("\n".join(compiled))
+            with open(f"{fname}.compiled", "w+") as f:
+                f.writelines("\n".join(compiled))
+
+if __name__ == "__main__":
+
+    import sys
+
+    if __name__ == '__main__':
+        for i in sys.argv[1:]:
+            print(f"compiling {i}")
+            load_parse(i)

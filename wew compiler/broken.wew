@@ -1,0 +1,9 @@
+func main() {
+  vars {
+    a := 1;
+    b;
+  }
+  program {
+    a := somefunc(a+b);
+  }
+}
