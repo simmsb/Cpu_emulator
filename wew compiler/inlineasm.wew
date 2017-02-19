@@ -1,0 +1,17 @@
+func printnum(inp) {
+  program {
+    _asm {
+      PRNTINT [@LSTK+1],
+      PRNTNL
+    }
+  }
+}
+
+func main() {
+  vars {
+    somevar:=3;
+  }
+  program {
+    printnum(somevar);
+  }
+}

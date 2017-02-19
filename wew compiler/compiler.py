@@ -298,20 +298,21 @@ def languageSyntaxOB(type_, *children):
 
 class functionCallOB(languageSyntaxOBbase):
 
-    def __init__(self, functionName, children):
-        super().__init__(children[0])
+    def __init__(self, functionName, params=[]):
+        super().__init__()
+        self.params = params
         self.functionName = functionName
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.functionName}> <args: {1}>>".format(
-            self, ", ".join("{}".format(str(i)) for i in self.children))
+            self, ", ".join("{}".format(str(i)) for i in self.params))
 
     def assemble(self):
         vars_ = no_depth_list()
         stack_pos = 0
         out = no_depth_list()
-        debug(f"functioncallOB_vals: {self.children}")
-        for i in self.children[0]:
+        debug(f"functioncallOB_vals: {self.params}")
+        for i in self.params:
             debug(f"valinst: {i}")
             if isinstance(i, int):
                 vars_ << ("val", f"#{i}")
@@ -469,6 +470,17 @@ class returnStmtOB(languageSyntaxOBbase):
         return out
 
 
+class inlineAsmOB(languageSyntaxOBbase):
+
+    def __init__(self, *asm):
+        debug(f"asm = {asm}")
+        super().__init__()
+        self.asm = asm
+
+    def assemble(self):
+        return self.asm
+
+
 class atoms:
     integer = pp.Word(pp.nums).setParseAction(lambda t: int(t[0]))
     variable = pp.Word(pp.alphas + "_", pp.alphanums + "_", exact=0)
@@ -498,8 +510,8 @@ class FuncCallSolver:
     args = arg + pp.ZeroOrMore(atoms.comma + arg)
     args.setParseAction(lambda t: varList(*t))
 
-    functionCall << atoms.variable + \
-        pp.Group(atoms.lparen + pp.Optional(args) + atoms.rparen)
+    functionCall << atoms.variable + atoms.lparen + \
+        pp.Optional(args) + atoms.rparen
     functionCall.setParseAction(lambda s, l, t: functionCallOB(*t))
 
     functionCallInline = functionCall + atoms.semicol
@@ -522,9 +534,17 @@ class returnStatement:
                    atoms.operand + atoms.semicol).setParseAction(lambda t: returnStmtOB(*t))
 
 
+class inlineAsm:
+
+    asm = (pp.Keyword("_asm").suppress() + atoms.opening_curly_bracket +
+           pp.Word(pp.alphanums + "_ $[]+-@") +
+           pp.ZeroOrMore(atoms.comma + pp.Word(pp.alphanums + "_ $[]+-@")) +
+           atoms.closing_curly_bracket()).setParseAction(lambda t: inlineAsmOB(*t))
+
+
 class SyntaxBlockParser:
 
-    program = AssignmentSolver.assignmentCall | FuncCallSolver.functionCallInline | returnStatement.returnStmnt
+    program = AssignmentSolver.assignmentCall | FuncCallSolver.functionCallInline | returnStatement.returnStmnt | inlineAsm.asm
     syntaxBlock = pp.Forward()
 
     Syntaxblk = pp.OneOrMore(pp.Group(syntaxBlock) | program)
@@ -547,8 +567,9 @@ class OperationsObjects:
     assignBlocks = AssignmentSolver.assignmentCall
     functionCallBlocks = FuncCallSolver.functionCallInline
     statements = returnStatement.returnStmnt
+    asm = inlineAsm.asm
 
-    operation = SyntaxBlocks | assignBlocks | functionCallBlocks | statements
+    operation = SyntaxBlocks | assignBlocks | functionCallBlocks | statements | asm
 
     @classmethod
     def parse(cls, string):
