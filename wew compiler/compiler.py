@@ -110,6 +110,9 @@ class mathOP(languageSyntaxOBbase):
             debug(f"parsing: {expr}")
             resolved = []
 
+            if isinstance(expr, mathOP):
+                return parse(expr.children)
+
             if isinstance(expr, (int, str)):
                 debug(f"ret str: {expr}")
                 return expr
@@ -127,7 +130,7 @@ class mathOP(languageSyntaxOBbase):
                         resolved.append(i)
                 elif i in ["+", "-", "*", "/"]:
                     next_ = parse(expr.pop())
-                    if isinstance(next_, str):
+                    if isinstance(next_, (str, int)):
                         next_ = [next_]
                     prev = resolved.pop()
                     resolved += next_

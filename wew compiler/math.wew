@@ -1,0 +1,19 @@
+func printint(num) {
+    program {
+        _asm {
+            PRNTINT [@LSTK+1],
+            PRNTNL
+        }
+    }
+}
+
+func main() {
+    vars {
+        a:=5;
+        b;
+    }
+    program {
+        b := 2 * 5 / (a-1) * 2;
+        printint(b);
+    }
+}
