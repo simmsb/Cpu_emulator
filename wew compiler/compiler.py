@@ -187,11 +187,23 @@ class assignOP(languageSyntaxOBbase):
 
 class variableOB(languageSyntaxOBbase):
 
-    def __init__(self, name, initial_val):
+    def __init__(self, data, initial_val):
         super().__init__()
-        self.type = NotImplemented  # TODO: Implement types
-        self.name = name
+        self.type = data[1]
+        if self.type == "list":
+            self.name = data[0][0]
+            self.length = data[0][1]
+        else:
+            self.name = data[0]
         self.initial = initial_val
+
+    def create(self):
+        if self.type == "list":
+            for i in range(self.length):
+                yield "pushstk #0"  # create stack space
+        else:
+            yield f"pushstk #{self.initial}"
+
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.name}> <initial: {0.initial}>>".format(
@@ -403,11 +415,10 @@ class functionDefineOB(languageSyntaxOBbase):
         ret = None
         if self.params:
             if VarName in self.params:
-                return "[@LSTK+{}]".format(self.params[::-1].index(VarName) + 1)
+                return (self.params[::-1].index(VarName) + 1)
         if self.vars_:
             if VarName in self.vars_:
-                return "[@LSTK-{}]".format(
-                    self.vars_.index(VarName) + 1)
+                return (self.vars_.index(VarName) + 1)
         else:
             debug(f"GETVAR FAILED: {VarName}")
             raise ParseException(
@@ -487,6 +498,7 @@ class inlineAsmOB(languageSyntaxOBbase):
 class atoms:
     integer = pp.Word(pp.nums).setParseAction(lambda t: int(t[0]))
     variable = pp.Word(pp.alphas + "_", pp.alphanums + "_", exact=0)
+
     operand = integer | variable
     semicol = pp.Literal(";").suppress()
     equals = pp.Literal(":=").suppress()
@@ -496,6 +508,9 @@ class atoms:
 
     lparen = pp.Literal("(").suppress()
     rparen = pp.Literal(")").suppress()
+    lsqrbrk = pp.Literal("[").suppress()
+    rsqrbrk = pp.Literal("]").suppress()
+
     comma = pp.Literal(",").suppress()
 
     comparison = pp.oneOf("== != > < >= <=")
@@ -506,6 +521,9 @@ class atoms:
     oplist = [(muldiv, 2, pp.opAssoc.LEFT),
               (addsub, 2, pp.opAssoc.LEFT)]
 
+    intvar = (pp.Keyword("int").suppress() + variable).setParseAction(lambda t: ([*t], "int"))
+    listvar = (pp.Keyword("list").suppress() + variable + lsqrbrk + integer + rsqrbrk).setParseAction(lambda t: ([*t], "list"))
+    typedvar = listvar | intvar
 
 class FuncCallSolver:
     functionCall = pp.Forward()
@@ -588,10 +606,10 @@ class ProgramObjects:
 
 class FunctionDefineParser:
 
-    var_assign_line = atoms.variable + atoms.equals + atoms.integer + atoms.semicol
+    var_assign_line = atoms.intvar + atoms.equals + atoms.integer + atoms.semicol
     var_assign_line.setParseAction(lambda s, l, t: variableOB(*t))
 
-    var_noassign_line = atoms.variable + atoms.semicol
+    var_noassign_line = atoms.typedvar + atoms.semicol
     var_noassign_line.setParseAction(lambda s, l, t: variableOB(*t, 0))
     # init params that start with nothing to 0 with 0
     varline = var_assign_line | var_noassign_line
