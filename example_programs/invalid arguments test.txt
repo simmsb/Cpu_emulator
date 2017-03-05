@@ -1,2 +1,0 @@
-mov #4 @acc wew ; this is impossible
-wew 4

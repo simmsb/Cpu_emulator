@@ -1,38 +1,38 @@
 call main
 halt
 _takesalist NOP
-PUSHSTK @LSTK
+PUSH @LSTK
 MOV @STK @LSTK
-MOV [[@lstk+2]+[@lstk+1]] @RET
+MOV [[@lstk+2]-[@lstk+1]] @RET
 MOV @LSTK @STK
-MOV [@STK+0] @LSTK
+MOV [@STK] @LSTK
 MOV @STK @ACC
-ADD #3
+ADD 3
 MOV @ACC @STK
 RET
-MOV #0 @RET
+MOV 0 @RET
 MOV @LSTK @STK
-MOV [@STK+0] @LSTK
+MOV [@STK] @LSTK
 MOV @STK @ACC
-ADD #3
+ADD 3
 MOV @ACC @STK
 RET
 _main NOP
-PUSHSTK @LSTK
+PUSH @LSTK
 MOV @STK @LSTK
-pushstk #4
-pushstk #4
-pushstk #4
-pushstk #4
-pushstk #4
+PUSH 4
+PUSH 4
+PUSH 4
+PUSH 4
+PUSH 4
 CALL takesalist @lstk-1 [@lstk-5]
 MOV @STK @ACC
-ADD #0
+ADD 0
 MOV @ACC @STK
-MOV #0 @RET
+MOV 0 @RET
 MOV @LSTK @STK
-MOV [@STK+0] @LSTK
+MOV [@STK] @LSTK
 MOV @STK @ACC
-ADD #1
+ADD 1
 MOV @ACC @STK
 RET

@@ -1,33 +1,29 @@
 call main
 halt
-_justreturn NOP
-PUSH @LSTK
-MOV @STK @LSTK
-MOV [@lstk+1] @RET
-MOV @LSTK @STK
-MOV [@STK] @LSTK
-MOV @STK @ACC
-ADD 2
-MOV @ACC @STK
-RET
-MOV 0 @RET
-MOV @LSTK @STK
-MOV [@STK] @LSTK
-MOV @STK @ACC
-ADD 2
-MOV @ACC @STK
-RET
 _main NOP
 PUSH @LSTK
 MOV @STK @LSTK
-PUSH 2
-CALL justreturn [@lstk-1]
+CMP 1 2
+meje jump_end_0
+_jump_start_0 CMP 555 31
+leje jump_end_0
+MOV 3 @RET
+MOV @LSTK @STK
+MOV [@STK] @LSTK
 MOV @STK @ACC
-ADD 0
+ADD 1
 MOV @ACC @STK
-PUSH @RET
-POP @ACC
-MOV @ACC [@lstk-1]
+RET
+JUMP jump_start_0
+_jump_end_0 NOP
+MOV 33 @RET
+MOV @LSTK @STK
+MOV [@STK] @LSTK
+MOV @STK @ACC
+ADD 1
+MOV @ACC @STK
+RET
+_jump_end_1 NOP
 MOV 0 @RET
 MOV @LSTK @STK
 MOV [@STK] @LSTK

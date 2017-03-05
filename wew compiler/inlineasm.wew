@@ -1,4 +1,4 @@
-func printnum(inp) {
+func printnum(int inp) {
   program {
     _asm {
       PRNTINT [@LSTK+1],
@@ -7,9 +7,19 @@ func printnum(inp) {
   }
 }
 
+func printlist(int size, list toprint) {
+	program {
+		size := size - 1;
+		while (size > 0) {
+			printnum(toprint[size]);
+			size := size - 1;
+		}
+	}
+}
+
 func main() {
   vars {
-    somevar:=3;
+    int somevar:=3;
   }
   program {
     printnum(somevar);

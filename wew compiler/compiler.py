@@ -50,7 +50,7 @@ class languageSyntaxOBbase:
     def get_variable(self, VarName):
         """Finds stack position of a variable, bubbles up to the parent function"""
         if isinstance(VarName, int):
-            return f"#{VarName}"
+            return f"{VarName}"
         if not self.parent:
             raise ParseException(
                 "object: {} attempted to gain variable {}, but it has no parent".
@@ -142,20 +142,20 @@ class mathOP(languageSyntaxOBbase):
         debug(parsed)
         for i in parsed:
             if isinstance(i, int):
-                yield f"PUSHSTK #{i}"
+                yield f"PUSH {i}"
             elif i in ["+", "-", "*", "/"]:
-                yield "POPSTK @ACC"
-                yield "POPSTK @EAX"
+                yield "POP @ACC"
+                yield "POP @EAX"
                 yield f"{asm_map[i]} @EAX"
-                yield "PUSHSTK @ACC"
+                yield "PUSH @ACC"
             elif isinstance(i, str):
-                yield f"PUSHSTK {self.get_variable(i)}"
+                yield f"PUSH {self.get_variable(i)}"
             elif isinstance(i, functionCallOB):
                 yield from i.assemble()
-                yield "PUSHSTK @RET"
+                yield "PUSH @RET"
             elif isinstance(i, listIndexOB):
-                yield f"PUSHSTK {i.location}"
-        yield "POPSTK @ACC"
+                yield f"PUSH [{i.location}]"
+        yield "POP @ACC"
 
 
 class assignOP(languageSyntaxOBbase):
@@ -164,14 +164,19 @@ class assignOP(languageSyntaxOBbase):
         self.setter = setter
         self.val = val
 
-        super().__init__(val)
+        super().__init__(setter, val)
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <setter: {0.setter}> <val: {0.val}>>".format(
             self)
 
     def assemble(self):
-        variable = self.get_variable(self.setter)
+        if isinstance(self.setter, str):
+            variable = self.get_variable(self.setter)
+        elif isinstance(self.setter, listIndexOB):
+            variable = self.setter.location
+        else:
+            raise Exception(f"Undefined item to define to, itemtype = {type(self.setter)}")
         right_side = self.val.assemble()
         # output of right_side always ends in @ACC
 
@@ -201,9 +206,9 @@ class variableOB(languageSyntaxOBbase):
     def create(self):
         if self.type == "list":
             for i in range(self.length):
-                yield f"pushstk #{self.initial}"  # create stack space
+                yield f"PUSH {self.initial}"  # create stack space
         else:
-            yield f"pushstk #{self.initial}"
+            yield f"PUSH {self.initial}"
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.name}> <initial: {0.initial}> <type: {0.type}> <len: {0.length}>>".format(
@@ -251,7 +256,7 @@ class ComparisonVar(languageSyntaxOBbase):
         if isinstance(item, str):
             return self.get_variable(item)
         elif isinstance(item, int):
-            return f"#{item}"
+            return f"{item}"
         elif isinstance(item, listIndexOB):
             return item.location
         else:
@@ -268,7 +273,7 @@ class whileTypeOB(ComparisonVar):
 
     def __str__(self):
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <comparison: {0.comp}> <codeblock: {1}>>".format(
-            self, ", ".join("{}".format(str(i)) for i in self.codeblock))
+            self, ", ".join(str(i) for i in self.codeblock))
 
     def assemble(self):
         out = no_depth_list()
@@ -298,8 +303,9 @@ class ifTypeOB(ComparisonVar):
         languageSyntaxOBbase.JID += 1
 
     def __str__(self):
+        print(type(self.codeblock))
         return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <comparison: {0.comp}> <codeblock: {1}>>".format(
-            self, ", ".join("{}".format(str(i)) for i in self.codeblock))
+            self, ", ".join(str(i) for i in self.codeblock))
 
 
 def languageSyntaxOB(type_, *children):
@@ -314,7 +320,7 @@ def languageSyntaxOB(type_, *children):
 class functionCallOB(languageSyntaxOBbase):
 
     def __init__(self, functionName, params=[]):
-        super().__init__()
+        super().__init__(*params)
         self.params = params
         self.functionName = functionName
 
@@ -330,21 +336,21 @@ class functionCallOB(languageSyntaxOBbase):
         for i in self.params:
             debug(f"valinst: {i}")
             if isinstance(i, int):
-                vars_ << ("val", f"#{i}")
+                vars_ << ("val", f"{i}")
             elif isinstance(i, str):
                 vars_ << ("var", self.get_variable(i))
             elif isinstance(i, listIndexOB):
-                vars_ << ("var", i.location)
+                vars_ << ("var", i.location)  # pass by ref, dont wrap in deref
             elif isinstance(i, mathOP):
                 for k in i.assemble():
                     yield k
-                yield "PUSHSTK @ACC"
+                yield "PUSH @ACC"
                 vars_ << ("stpos", stack_pos)
                 stack_pos += 1
             elif isinstance(i, functionCallOB):
                 for k in i.assemble():
                     yield k
-                yield "PUSHSTK @RET"  # functions end up in the ret register
+                yield "PUSH @RET"  # functions end up in the ret register
                 vars_ << ("stpos", stack_pos)
                 stack_pos += 1
 
@@ -366,7 +372,7 @@ class functionCallOB(languageSyntaxOBbase):
                 #
         yield "CALL {} {}".format(self.functionName, " ".join(assembled_vars))
         yield "MOV @STK @ACC"  # we need to clean up our stack located arguments
-        yield f"ADD #{stack_pos}"
+        yield f"ADD {stack_pos}"
         yield "MOV @ACC @STK"
         debug(f"FUNCcOP: {out}")
 
@@ -387,9 +393,9 @@ class listIndexOB(languageSyntaxOBbase):
     def location(self):  # resolves index to the value at the index
         base = self.get_variable(self.name)
         if isinstance(self.index, int):  # static
-            return f"[{base}+{self.index}]"
+            return f"{base}-{self.index}"
         if isinstance(self.index, str):  # vars
-            return f"[{base}+{self.get_variable(self.index)}]"
+            return f"{base}-{self.get_variable(self.index)}"
 
 
 class functionDefineOB(languageSyntaxOBbase):
@@ -408,6 +414,9 @@ class functionDefineOB(languageSyntaxOBbase):
 
     def get_variable(self, VarName):
         '''
+        returns a variables location in memory
+
+
         func wew(a,b,c){
             vars{
                 d:=0;
@@ -433,8 +442,7 @@ class functionDefineOB(languageSyntaxOBbase):
         if VarName in self.params:
             index = sum(i.length for i in self.params[
                         :self.params.index(VarName)]) + 1
-            # var was passed to program, so we pass the variable reference as
-            # if it was an integer
+            # if var was passed to program as a reference, just return it
             return f"[@lstk+{index}]"
         elif VarName in self.vars_:
             index = sum(i.length for i in self.vars_[
@@ -461,18 +469,18 @@ class functionDefineOB(languageSyntaxOBbase):
         out = no_depth_list()
         yield f"_{self.name} NOP"
         # save previous base pointer [ret, a, b, c, lstk]
-        yield "PUSHSTK @LSTK"
+        yield "PUSH @LSTK"
         yield "MOV @STK @LSTK"  # copy current stack pointer to base pointer
         if self.vars_:
             for i in self.vars_:  # insert our function local vars
                 yield from i.create()
         yield from self.assemble_list(self.children)
-        yield "MOV #0 @RET"  # setup fall through return function
+        yield "MOV 0 @RET"  # setup fall through return function
         yield "MOV @LSTK @STK"  # pull stack pointer back to base pointer
         # restore base pointer of previous function
-        yield "MOV [@STK+0] @LSTK"
+        yield "MOV [@STK] @LSTK"
         yield "MOV @STK @ACC"
-        yield f"ADD #{self.num_params+1}"
+        yield f"ADD {self.num_params+1}"
         yield "MOV @ACC @STK"
         yield "RET"
 
@@ -496,13 +504,13 @@ class returnStmtOB(languageSyntaxOBbase):
         if isinstance(self.returnVar, str):  # assume variable name
             yield f"MOV {self.get_variable(self.returnVar)} @RET"
         elif isinstance(self.returnVar, int):
-            yield f"MOV #{self.returnVar} @RET"
+            yield f"MOV {self.returnVar} @RET"
         elif isinstance(self.returnVar, listIndexOB):
-            yield f"MOV {self.returnVar.location} @RET"
+            yield f"MOV [{self.returnVar.location}] @RET"
         yield "MOV @LSTK @STK"
-        yield "MOV [@STK+0] @LSTK"
+        yield "MOV [@STK] @LSTK"
         yield "MOV @STK @ACC"
-        yield f"ADD #{self.num_params+1}"
+        yield f"ADD {self.num_params+1}"
         yield "MOV @ACC @STK"
         yield "RET"
 
@@ -578,7 +586,7 @@ class AssignmentSolver:
     expr = pp.infixNotation(
         operator, atoms.oplist).setParseAction(lambda s, l, t: mathOP(t.asList()))
 
-    assign = atoms.variable + atoms.equals + expr
+    assign = (atoms.listindex | atoms.variable) + atoms.equals + expr
     assignmentCall = assign + atoms.semicol
     assignmentCall.setParseAction(lambda s, l, t: assignOP(*t))
 
@@ -602,7 +610,7 @@ class SyntaxBlockParser:
     program = AssignmentSolver.assignmentCall | FuncCallSolver.functionCallInline | returnStatement.returnStmnt | inlineAsm.asm
     syntaxBlock = pp.Forward()
 
-    Syntaxblk = pp.OneOrMore(pp.Group(syntaxBlock) | program)
+    Syntaxblk = pp.OneOrMore(syntaxBlock | program)
 
     condition = atoms.lparen + atoms.operand + \
         atoms.comparison + atoms.operand + atoms.rparen
@@ -613,7 +621,7 @@ class SyntaxBlockParser:
     syntaxBlock << blockTypes + condition + \
         atoms.opening_curly_bracket + Syntaxblk + atoms.closing_curly_bracket
     syntaxBlock.setParseAction(
-        lambda s, l, t: languageSyntaxOB(*t))
+        lambda t: languageSyntaxOB(*t))
 
 
 class OperationsObjects:
@@ -688,8 +696,8 @@ def load_parse(fname):
         debug(f"functions = {functions}")
         for i in functions:
             i.parent_own_children()
-            compiled += i.assemble()
             print(format_string(str(i)))
+            compiled += i.assemble()
 
             with open(f"{fname}.compiled", "w+") as f:
                 f.writelines("\n".join(compiled))

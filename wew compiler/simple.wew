@@ -1,4 +1,4 @@
-func justreturn(a) {
+func justreturn(int a) {
   program {
     return a;
   }
@@ -6,7 +6,7 @@ func justreturn(a) {
 
 func main() {
   vars {
-    b := 2;
+    int b := 2;
   }
   program {
     b := justreturn(b);

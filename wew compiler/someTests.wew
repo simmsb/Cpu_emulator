@@ -1,13 +1,13 @@
-func double(a) {
+func double(int a) {
   program {
     a := a*2;
     return a;
   }
 }
 
-func test(a, b, c, d) {
+func test(int a, int b, int c, int d) {
   vars {
-    t;
+    int t;
   }
   program {
     t := a*b*c*d;
@@ -18,7 +18,7 @@ func test(a, b, c, d) {
 
 func main() {
   vars {
-    a;
+    int a;
   }
   program {
     a := test(1,2,3,4);

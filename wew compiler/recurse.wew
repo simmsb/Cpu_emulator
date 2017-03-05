@@ -16,7 +16,6 @@ func factorial(int a) {
 func main() {
   vars {
     int t;
-    list testlist[33];
   }
   program {
     t := factorial(4);

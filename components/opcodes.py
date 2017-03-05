@@ -107,7 +107,7 @@ class InstructionSet:
             self.cpu.registers[to_loc.lstrip(
                 "@")] = self.cpu.interpret_read_address(from_loc)
         else:
-            self.cpu.memory[self.cpu.interpret_write_address(
+            self.cpu.memory[self.cpu.interpret_read_address(
                 to_loc)] = self.cpu.interpret_read_address(from_loc)
 
     @instruction()
@@ -198,7 +198,7 @@ class InstructionSet:
             self.cpu.registers[memloc.strip("@").lower()] = int(
                 input("Enter number: "))
         else:
-            self.cpu.memory[self.cpu.interpret_write_address(
+            self.cpu.memory[self.cpu.interpret_read_address(
                 memloc)] = int(input("Enter number: "))
 
     # like anything wrong could happen here
@@ -209,32 +209,21 @@ class InstructionSet:
 
     @instruction()
     @exception_wrapper
-    def movloc(self, from_loc, to_loc):
-        # move from location stored in location to location
-        if to_loc.startswith("@"):
-            self.cpu.registers[to_loc.lstrip("@")] = self.cpu.memory[
-                self.cpu.interpret_read_address(from_loc)]
-        else:
-            self.cpu.memory[self.cpu.interpret_write_address(to_loc)] = self.cpu.memory[
-                self.cpu.interpret_read_address(from_loc)]
-
-    @instruction()
-    @exception_wrapper
-    def popstk(self, memloc=None):
+    def pop(self, memloc=None):
         if self.cpu.registers["stk"] > self.cpu.memory.size:
-            return 0  # assume everything above maximum address is 0
+            raise Exception("Stack underflow, attempt to pop from empty stack")
         if memloc is not None:
             if memloc.startswith("@"):
                 self.cpu.registers[memloc.lstrip("@")] = self.cpu.memory[
                     self.cpu.registers["stk"]]
             else:
-                self.cpu.memory[self.cpu.interpret_write_address(memloc)] = self.cpu.memory[
+                self.cpu.memory[self.cpu.interpret_read_address(memloc)] = self.cpu.memory[
                     self.cpu.registers["stk"]]
         self.cpu.registers["stk"] += 1  # stack descends upwardas
 
     @instruction()
     @exception_wrapper
-    def pushstk(self, value):
+    def push(self, value):
         # decrement first since last push will leave us one below
         self.cpu.registers["stk"] -= 1
         self.cpu.memory[self.cpu.registers["stk"]

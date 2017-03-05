@@ -1,0 +1,10 @@
+func main() {
+	program {
+		if (1 < 2) {
+			while (555 > 31) {
+				return 3;
+			}
+			return 33;
+		}
+	}
+}

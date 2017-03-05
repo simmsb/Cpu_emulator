@@ -1,13 +1,13 @@
-func addtwo(a, b) {
+func addtwo(int a, int b) {
   program {
     a := a + b;
     return a;
   }
 }
 
-func comparenums(this, that){
+func comparenums(int this, int that){
   vars {
-    a := 2;
+    int a := 2;
   }
   program {
     a := addtwo(a, a);
@@ -22,7 +22,7 @@ func comparenums(this, that){
 
 func main(){
   vars {
-    a;
+    int a;
   }
   program {
     a := comparenums(comparenums(1, 2), 10);

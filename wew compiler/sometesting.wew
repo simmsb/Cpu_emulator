@@ -1,0 +1,28 @@
+
+func test2ndref(list ilst) {
+  program {
+    ilst[0] := 0101;
+  }
+}
+
+func testfunc(int someint, list somelist) {
+  vars {
+    list mylocal1[4] := 6;
+    int mylocal2 := 55;
+  }
+  program {
+    somelist[2] := mylocal1[0];
+    somelist[3] := mylocal2;
+    test2ndref(somelist);
+  }
+}
+
+
+func main() {
+  vars {
+    list mainl[5];
+  }
+  program {
+    testfunc(21, mainl);
+  }
+}

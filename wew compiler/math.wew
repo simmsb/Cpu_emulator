@@ -1,4 +1,4 @@
-func printint(num) {
+func printint(int num) {
     program {
         _asm {
             PRNTINT [@LSTK+1],
@@ -9,8 +9,8 @@ func printint(num) {
 
 func main() {
     vars {
-        a:=5;
-        b;
+        int a:=5;
+        int b;
     }
     program {
         b := 2 * 5 / (a-1) * 2;

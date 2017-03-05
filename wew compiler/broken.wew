@@ -1,7 +1,7 @@
 func main() {
   vars {
-    a := 1;
-    b;
+    int a := 1;
+    int b;
   }
   program {
     a := somefunc(a+b);

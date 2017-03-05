@@ -1,9 +1,9 @@
 func main() {
     vars {
-        a;
-        b := 1;
-        temp;
-        count;
+        int a;
+        int b := 1;
+        int temp;
+        int count;
     }
     program {
         while (count<10) {

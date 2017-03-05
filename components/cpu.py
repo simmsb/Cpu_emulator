@@ -1,10 +1,10 @@
 import re
 import traceback
 
+from .addressparser import parseLocation
 from .memory import *
 from .opcodes import *
 
-DEBUG = False
 INTERACTIVE = True
 
 
@@ -45,6 +45,7 @@ class Registers:
 
 
 class Cpu:
+    debugging = True
     """CPU that links instructions, memory and registers together
 
     Arguments
@@ -68,6 +69,10 @@ class Cpu:
         self.registers = Registers(self.memory.size)
         self.instruction_set = InstructionSet(self)
 
+    def debug(self, *args, **kwargs):
+        if self.debugging:
+            print(*args, **kwargs)
+
     @staticmethod
     def _split_every(string, n):
         n = max(1, n)
@@ -81,20 +86,18 @@ class Cpu:
             opcode = int(str(value)[:3])
             split_codes = self._split_every(str(value)[3:], 8)
             operands = ''.join([chr(int(i)) for i in split_codes]).split()
-            if DEBUG:
-                print(self.registers.registers)
-                print("Opcode was: {}".format(opcode))
-                print("CMP is {}".format(self.registers["cmp"]))
-                print("Operands were: {}".format(operands))
-                print("Memory is: {}".format(self.memory.cells))
+            self.debug(self.registers.registers)
+            self.debug("Opcode was: {}".format(opcode))
+            self.debug("CMP is {}".format(self.registers["cmp"]))
+            self.debug("Operands were: {}".format(operands))
+            self.debug("Memory is: {}".format(self.memory.cells))
             self.instruction_set.run_encoded(opcode, *operands)
-            if DEBUG:
-                print(f"stack: {self.memory.cells[self.registers['stk']:self.memory.size]}")
-                print(f"stk: {self.registers['stk']}")
-                print(f"lstk: {self.registers['lstk']}")
-                print(f"cur: {self.registers['cur']}")
-                print(f"ret: {self.registers['ret']}")
-                print(f"current command: {self.instruction_set.encoded_commands[opcode].__name__}\n\n")
+            self.debug(f"stack: {self.memory.cells[self.registers['stk']:self.memory.size]}")
+            self.debug(f"stk: {self.registers['stk']}")
+            self.debug(f"lstk: {self.registers['lstk']}")
+            self.debug(f"cur: {self.registers['cur']}")
+            self.debug(f"ret: {self.registers['ret']}")
+            self.debug(f"current command: {self.instruction_set.encoded_commands[opcode].__name__}\n\n")
         except CpuStoppedCall as e:
             raise e  # re-raise here so we can ignore it
         except Exception as e:
@@ -105,71 +108,16 @@ class Cpu:
             print("exception was: {}".format(traceback.format_exc()))
             raise CpuStoppedCall("Computer Crashed Halt")
 
-    def interpret_write_address(self, string):
-        if not isinstance(string, str):
-            raise ValueError(
-                "{} supplied to interpret_write_address".format(string))
-
-        # allow for in-place addition/ subtraction
-        in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")
-        function_match = re.compile("(?![^+-])[+-](?=[^+-])")
-
-        function_map = {
-            "+": (lambda a, b: interpret_memory_location(a) + int(b)),
-            "-": (lambda a, b: interpret_memory_location(a) - int(b))
-        }
-
-        def interpret_memory_location(location_string):
-            return self.registers[location_string.lstrip("@")] if location_string.startswith("@") else \
-                self.memory[int(location_string)]
-
-        multiples = in_place_add.search(string)
-        if multiples:
-            return function_map[function_match.search(multiples.group()).group()](*re.split(r"[+-]", multiples.group()))
-        else:
-            return int(string)
-
     def interpret_read_address(self, string):
-        """#3 for immediate
-        @reg for register
-        3 for memory_location"""
-        if not isinstance(string, str):
-            raise ValueError(
-                "{} supplied to interpret_read_address".format(string))
-
-        # allow for in-place addition/ subtraction
-        in_place_add = re.compile("(?!\[)([^\[\]]+)[+-]([^\[\]]+)(?=\])")
-        function_match = re.compile("(?![^+-])[+-](?=[^+-])")
-
-        function_map = {
-            "+": (lambda a, b: interpret(a) + int(b)),
-            "-": (lambda a, b: interpret(a) - int(b))
-        }
-
-        def interpret_memory_location(location_string):
-            return self.registers[location_string.lstrip("@")] if location_string.startswith("@") else \
-                self.memory[int(location_string)]
-
-        def interpret(location_string):
-            return int(location_string.lstrip("#")) if location_string.startswith("#") else \
-                interpret_memory_location(location_string)
-
-        multiples = in_place_add.search(string)
-        if DEBUG:
-            print(f"multiples: {multiples}")
-        if multiples:
-            return self.memory[function_map[function_match.search(multiples.group()).group()](*re.split(r"[+-]", multiples.group()))]
-        else:
-            return interpret(string)
+        return parseLocation(string, self)
 
     def execute(self):
         while True:
             try:
                 current_instruction = self.memory[self.registers["cur"]]
-                if DEBUG:
-                    print(f"cur is: {self.registers['cur']}")
-                    print(f"STK is: {self.registers['stk']}")
-                    print(f"LSTK is: {self.registers['lstk']}")
+                self.debug(f"cur is: {self.registers['cur']}")
+                self.debug(f"STK is: {self.registers['stk']}")
+                self.debug(f"LSTK is: {self.registers['lstk']}")
                 self.registers["cur"] += 1  # increment counter
                 self._decode_numeric_command(current_instruction)
             except CpuStoppedCall as e:

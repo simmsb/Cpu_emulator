@@ -1,10 +1,11 @@
 call main
 halt
-_printnum NOP
+_test2ndref NOP
 PUSH @LSTK
 MOV @STK @LSTK
-PRNTINT [@LSTK+1]
-PRNTNL
+PUSH 101
+POP @ACC
+MOV @ACC [@lstk+1]-0
 MOV 0 @RET
 MOV @LSTK @STK
 MOV [@STK] @LSTK
@@ -12,33 +13,24 @@ MOV @STK @ACC
 ADD 2
 MOV @ACC @STK
 RET
-_printlist NOP
+_testfunc NOP
 PUSH @LSTK
 MOV @STK @LSTK
-PUSH [@lstk+1]
-PUSH 1
+PUSH 6
+PUSH 6
+PUSH 6
+PUSH 6
+PUSH 55
+PUSH [@lstk-1-0]
 POP @ACC
-POP @EAX
-SUB @EAX
-PUSH @ACC
+MOV @ACC [@lstk+1]-2
+PUSH [@lstk-5]
 POP @ACC
-MOV @ACC [@lstk+1]
-_jump_start_0 CMP [@lstk+1] 0
-leje jump_end_0
-CALL printnum [@lstk+1]-[@lstk+1]
+MOV @ACC [@lstk+1]-3
+CALL test2ndref [@lstk+1]
 MOV @STK @ACC
 ADD 0
 MOV @ACC @STK
-PUSH [@lstk+1]
-PUSH 1
-POP @ACC
-POP @EAX
-SUB @EAX
-PUSH @ACC
-POP @ACC
-MOV @ACC [@lstk+1]
-JUMP jump_start_0
-_jump_end_0 NOP
 MOV 0 @RET
 MOV @LSTK @STK
 MOV [@STK] @LSTK
@@ -49,8 +41,12 @@ RET
 _main NOP
 PUSH @LSTK
 MOV @STK @LSTK
-PUSH 3
-CALL printnum [@lstk-1]
+PUSH 0
+PUSH 0
+PUSH 0
+PUSH 0
+PUSH 0
+CALL testfunc 21 @lstk-1
 MOV @STK @ACC
 ADD 0
 MOV @ACC @STK
