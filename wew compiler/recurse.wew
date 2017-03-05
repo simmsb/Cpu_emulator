@@ -1,6 +1,6 @@
-func factorial(a) {
+func factorial(int a) {
   vars {
-    t;
+    int t;
   }
   program {
     if (a <= 0) {
@@ -15,7 +15,8 @@ func factorial(a) {
 
 func main() {
   vars {
-    t;
+    int t;
+    list testlist[33];
   }
   program {
     t := factorial(4);

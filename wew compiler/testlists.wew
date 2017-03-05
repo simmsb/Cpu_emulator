@@ -1,0 +1,15 @@
+func takesalist(list a, int length) {
+    program {
+        return a[length];
+    }
+}
+
+func main() {
+  vars {
+    list a[4] := 4;
+    int size := 4;
+  }
+  program {
+    takesalist(a, size);
+  }
+}
