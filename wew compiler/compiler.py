@@ -113,7 +113,7 @@ class mathOP(languageSyntaxOBbase):
             if isinstance(expr, mathOP):
                 return parse(expr.children)
 
-            if isinstance(expr, (int, str)):
+            if isinstance(expr, (int, str, listIndexOB)):
                 debug(f"ret str: {expr}")
                 return expr
 
@@ -157,6 +157,8 @@ class mathOP(languageSyntaxOBbase):
                 for i in i.assemble():
                     out << i
                 out << "PUSHSTK @RET"
+            elif isinstance(i, listIndexOB):
+                out << f"PUSHSTK {i.location}"
         out << "POPSTK @ACC"
         return out
 
@@ -187,26 +189,31 @@ class assignOP(languageSyntaxOBbase):
 
 class variableOB(languageSyntaxOBbase):
 
-    def __init__(self, data, initial_val):
+    def __init__(self, type, name, part=0, listinital=None):
+        # if int: (type=type, name=name, part=initial)
+        # if list: (type=type, name=name, part=length)
         super().__init__()
-        self.type = data[1]
+        print(f"VARIABLE: name {name}, type {type}, part {part}, lstninit {listinital}")
+        self.type = type
+        self.name = name
         if self.type == "list":
-            self.name = data[0][0]
-            self.length = data[0][1]
+            self.length = part
+            self.initial = listinital
+            self.isref = True
         else:
-            self.name = data[0]
-        self.initial = initial_val
+            self.isref = False
+            self.initial = part
+            self.length = 1
 
     def create(self):
         if self.type == "list":
             for i in range(self.length):
-                yield "pushstk #0"  # create stack space
+                yield f"pushstk #{self.initial}"  # create stack space
         else:
             yield f"pushstk #{self.initial}"
 
-
     def __str__(self):
-        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.name}> <initial: {0.initial}>>".format(
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.name}> <initial: {0.initial}> <type: {0.type}> <len: {0.length}>".format(
             self)
 
     def __eq__(self, other):
@@ -332,7 +339,7 @@ class functionCallOB(languageSyntaxOBbase):
             if isinstance(i, int):
                 vars_ << ("val", f"#{i}")
             elif isinstance(i, str):
-                vars_ << ("var", self.get_variable(i))
+                vars_ << ("var", self.get_variable_call(i))
             elif isinstance(i, mathOP):
                 for k in i.assemble():
                     out << k
@@ -351,7 +358,7 @@ class functionCallOB(languageSyntaxOBbase):
 
         assembled_vars = no_depth_list()
         for j, k in vars_:
-            debug(f"ass: {j}: {k}")
+            debug(f"varsdebug: name->{j}: val->{k}")
             if j == "stpos":
                 assembled_vars << f"[@STK+{stack_pos+k}]"
             else:
@@ -370,9 +377,25 @@ class functionCallOB(languageSyntaxOBbase):
         return out
 
 
-def varList(*vars):
+def varList(*vars):  # idk TODO: Fuck this
 
     return vars
+
+
+class listIndexOB(languageSyntaxOBbase):
+
+    def __init__(self, name, index):
+        super().__init__(index)
+        self.name = name
+        self.index = index
+
+    @property
+    def location(self):  # resolves index to the value at the index
+        base = self.get_variable(self.name)
+        if isinstance(self.index, int):  # static
+            return f"[{base}+{self.index}]"
+        if isinstance(self.index, str):  # vars
+            return f"[{base}+{self.get_variable(self.index)}]"
 
 
 class functionDefineOB(languageSyntaxOBbase):
@@ -380,12 +403,14 @@ class functionDefineOB(languageSyntaxOBbase):
     def __init__(self, name, params, vars_, program):
         super().__init__(program)
         self.name = name
-        self.params = params
-        self.vars_ = vars_
+        self.params = if params is None [] else params[::-1]
+        self.vars_ = if vars_ is None [] else vars_
 
     def __str__(self):
-        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.name}> <params: {0.params}> <vars: {0.vars_}> <children: {1}>>".format(
-            self, [str(i) for i in self.children])
+        return "<{0.__class__.__name__} object: <parent: {0.parent.__class__.__name__}> <name: {0.name}> <params: {1}> <vars: {2}> <children: {3}>>".format(
+            self, [str(i) for i in self.params], [str(i) for i in self.vars_], [str(i) for i in self.children])
+
+    # gets the position of a local variable/ passed arg
 
     def get_variable(self, VarName):
         '''
@@ -411,19 +436,26 @@ class functionDefineOB(languageSyntaxOBbase):
         |e|  - 2, 1
 
         '''
-        debug(f"getting variable {VarName}, t: {type(VarName)}")
-        ret = None
-        if self.params:
-            if VarName in self.params:
-                return (self.params[::-1].index(VarName) + 1)
-        if self.vars_:
-            if VarName in self.vars_:
-                return (self.vars_.index(VarName) + 1)
+        if VarName in self.params:
+            index = sum(i.length for i in self.params[
+                        :self.params.index(VarName)]) + 1
+            # var was passed to program, so we pass the variable reference as
+            # if it was an integer
+            return f"[@lstk+{index}]"
+        elif VarName in self.vars_:
+            index = sum(i.length for i in self.vars_[
+                        :self.vars_.index(VarName)]) + 1
+            var = self.vars_[self.vars_.index(VarName)]
+            if var.isref:
+                # variable is located on the local stack frame, get a
+                # reference to it
+                return f"@lstk-{index}"
+            else:  # is a non pass by ref, so just get the value itself
+                return f"[@lstk-{index}]"
         else:
-            debug(f"GETVAR FAILED: {VarName}")
+            debug(f"GETPASSVAR FAILED: {VarName}")
             raise ParseException(
-                "Attempt to access variable not in scope. Current function: {}, variable: {}".
-                format(self.name, VarName))
+                f"Attempt to access variable not in scope. Current function: {self.name}, variable: {VarName}")
 
     @property
     def num_params(self):
@@ -439,7 +471,8 @@ class functionDefineOB(languageSyntaxOBbase):
         out << "MOV @STK @LSTK"  # copy current stack pointer to base pointer
         if self.vars_:
             for i in self.vars_:  # insert our function local vars
-                out << f"PUSHSTK #{i.initial}"
+                for n in i.create():
+                    out << n
         for i in self.assemble_list(self.children):
             out << i  # insert function code
         out << "MOV #0 @RET"  # setup fall through return function
@@ -474,6 +507,8 @@ class returnStmtOB(languageSyntaxOBbase):
             out << f"MOV {self.get_variable(self.returnVar)} @RET"
         elif isinstance(self.returnVar, int):
             out << f"MOV #{self.returnVar} @RET"
+        elif isinstance(self.returnVar, listIndexOB):
+            out << f"MOV {self.returnVar.location} @RET]"
         out << "MOV @LSTK @STK"
         out << "MOV [@STK+0] @LSTK"
         out << "MOV @STK @ACC"
@@ -488,7 +523,7 @@ class inlineAsmOB(languageSyntaxOBbase):
 
     def __init__(self, *asm):
         debug(f"asm = {asm}")
-        super().__init__()
+        super().__init__(asm)
         self.asm = asm
 
     def assemble(self):
@@ -499,7 +534,6 @@ class atoms:
     integer = pp.Word(pp.nums).setParseAction(lambda t: int(t[0]))
     variable = pp.Word(pp.alphas + "_", pp.alphanums + "_", exact=0)
 
-    operand = integer | variable
     semicol = pp.Literal(";").suppress()
     equals = pp.Literal(":=").suppress()
 
@@ -521,9 +555,18 @@ class atoms:
     oplist = [(muldiv, 2, pp.opAssoc.LEFT),
               (addsub, 2, pp.opAssoc.LEFT)]
 
-    intvar = (pp.Keyword("int").suppress() + variable).setParseAction(lambda t: ([*t], "int"))
-    listvar = (pp.Keyword("list").suppress() + variable + lsqrbrk + integer + rsqrbrk).setParseAction(lambda t: ([*t], "list"))
+    intvar = (pp.Keyword("int") + variable)  # ['int', name]
+    listvar = (pp.Keyword("list") + variable + lsqrbrk +
+               integer + rsqrbrk)  # ['list', name, size]
     typedvar = listvar | intvar
+
+    initTypedVar = typedvar.copy().setParseAction(lambda t: variableOB(*t))
+    listindex = atoms.variable + atoms.lsqrbrk + \
+        (integer | variable) + atoms.rsqrbrk
+    listindex.setParseAction(lambda t: listIndexOB(*t))
+
+    operand = integer | variable | listindex
+
 
 class FuncCallSolver:
     functionCall = pp.Forward()
@@ -606,7 +649,7 @@ class ProgramObjects:
 
 class FunctionDefineParser:
 
-    var_assign_line = atoms.intvar + atoms.equals + atoms.integer + atoms.semicol
+    var_assign_line = atoms.typedvar + atoms.equals + atoms.integer + atoms.semicol
     var_assign_line.setParseAction(lambda s, l, t: variableOB(*t))
 
     var_noassign_line = atoms.typedvar + atoms.semicol
@@ -617,13 +660,11 @@ class FunctionDefineParser:
         pp.OneOrMore(varline) + atoms.closing_curly_bracket
     varsblock.setParseAction(lambda s, l, t: varList(*t))
 
-    arg = copy.copy(atoms.variable)
-    arg.setParseAction(lambda s, l, t: variableOB(*t, 0))
-
-    args = atoms.variable + pp.ZeroOrMore(atoms.comma + atoms.variable)
+    args = atoms.initTypedVar + \
+        pp.ZeroOrMore(atoms.comma + atoms.initTypedVar)
 
     argblock = atoms.lparen + pp.Optional(args) + atoms.rparen
-    argblock.setParseAction(lambda s, l, t: varList(*t))
+    argblock.setParseAction(lambda t: varList(*t))
 
     startblock = pp.Keyword("func").suppress() + atoms.variable + \
         argblock + atoms.opening_curly_bracket
@@ -653,7 +694,7 @@ def load_parse(fname):
         functions = ProgramSolver.parse(program)  # .strip("\n"))
 
         compiled = ["call main", "halt"]
-        debug(functions)
+        debug(f"functions = {functions}")
         for i in functions:
             i.parent_own_children()
             compiled += i.assemble()
