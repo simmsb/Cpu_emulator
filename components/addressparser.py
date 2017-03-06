@@ -7,7 +7,8 @@ class Register:
         self.name = name
 
     def find(self, cpu):
-        return cpu.registers[self.name]
+        print(f"cpu.registers = {cpu.registers.registers}")
+        return cpu.registers[self.name.lower()]
 
     def __str__(self):
         return f"<reg {self.name}>"
@@ -61,7 +62,8 @@ class Math:
             if not rest:
                 return binaryop(left, op, right)
             return consume(binaryop(left, op, right), *rest)
-
+        if len(self.operation) == 1:
+            return self.operation[0].find(cpu)
         return consume(*self.operation).find(cpu)
 
     def __str__(self):
@@ -75,22 +77,22 @@ class LocationParse:
 
     integer = pp.Word(pp.nums).setParseAction(lambda t: int(t[0]))
 
-    register = (pp.Literal("@").suppress() + pp.Word(pp.alphas)
+    register = (pp.Literal("@").suppress() + pp.Word(pp.srange("[a-zA-Z]"))
                 ).setParseAction(lambda t: Register(*t))
     immediate = integer.copy().setParseAction(lambda t: Immediate(*t))
 
     dereference = pp.Forward()
 
-    combination = immediate | register | dereference
+    combination = immediate ^ register ^ dereference
 
     addsub = pp.oneOf("+ -")
     mathop = combination + pp.ZeroOrMore(addsub + combination)
     mathop.setParseAction(lambda t: Math(*t))
 
-    dereference << lsqrbrk + (combination | mathop) + rsqrbrk
+    dereference << lsqrbrk + (mathop ^ combination) + rsqrbrk
     dereference.setParseAction(lambda t: Dereference(*t))
 
-    parsed = combination | mathop | dereference
+    parsed = combination ^ mathop ^ dereference
 
 
 def parseLocation(locstring, cpu):
@@ -103,6 +105,9 @@ def parseLocation(locstring, cpu):
 
     [a+1] := value contained at memory location (a + 1)
     """
-    data = LocationParse.parsed.parseString(locstring).asList()[0]
+    cpu.debug(f"parsing location: {locstring}")
+    data = LocationParse.parsed.parseString(locstring).asList()
     cpu.debug(data)
-    return data.find(cpu)
+    result = data[0].find(cpu)
+    cpu.debug(f"result was: {result}")
+    return result

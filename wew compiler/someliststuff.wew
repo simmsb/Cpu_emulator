@@ -1,0 +1,19 @@
+func printnum(int val) {
+    program {
+        _asm {
+            PRNTINT [@LSTK-1],
+            PRNTNL
+        }
+    }
+}
+
+func main() {
+    vars {
+        list locallist[5] := 4;
+    }
+    program {
+        locallist[3] := 22;
+        printnum(locallist[0]);
+        printnum(locallist[3]);
+    }
+}

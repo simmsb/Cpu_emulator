@@ -34,14 +34,14 @@ class Registers:
 
     def __getitem__(self, key):
         if self.registers.get(key) is None:
-            raise CpuStoppedCall("Attemt to access nonexistant register")
+            raise CpuStoppedCall(f"Attemt to access nonexistant register, request was: {key}")
         return self.registers.get(key)
 
     def __setitem__(self, key, value):
         if self.registers.get(key) is not None:
             self.registers[key] = value
         else:
-            raise CpuStoppedCall("Attemt to access nonexistant register")
+            raise CpuStoppedCall(f"Attemt to set nonexistant register, req was: {key}, to be set to: {value}")
 
 
 class Cpu:
@@ -114,6 +114,7 @@ class Cpu:
     def execute(self):
         while True:
             try:
+                input("enter to run next iteration\n")
                 current_instruction = self.memory[self.registers["cur"]]
                 self.debug(f"cur is: {self.registers['cur']}")
                 self.debug(f"STK is: {self.registers['stk']}")
@@ -184,7 +185,7 @@ class Compiler:
             op = split[0]
             if not self.instruction_set.encode_name(op):  # is a jump
                 if op.startswith("_"):  # is a jump
-                    named_jumps[op[1:]] = "#{}".format(str(i))
+                    named_jumps[op[1:]] = "{}".format(str(i))
                     temporary_commands[i] = " ".join(split[1:])
 
         program_length = len(temporary_commands)
