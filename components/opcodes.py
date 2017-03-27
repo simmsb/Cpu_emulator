@@ -103,7 +103,7 @@ class InstructionSet:
     @instruction()
     @exception_wrapper
     def mov(self, from_loc, to_loc):
-        if to_loc.startswith("@") and to_loc[1:] in self.cpu.registers.registers.keys():
+        if to_loc.startswith("@"):
             self.cpu.registers[to_loc.lstrip(
                 "@")] = self.cpu.interpret_read_address(from_loc)
         else:
@@ -194,7 +194,7 @@ class InstructionSet:
     @instruction(alt="input")
     @exception_wrapper
     def inp(self, memloc):
-        if memloc.statswith("@") and memloc[1:] in self.cpu.registers.registers.keys():
+        if memloc.startswith("@"):
             self.cpu.registers[memloc.strip("@").lower()] = int(
                 input("Enter number: "))
         else:
@@ -213,7 +213,7 @@ class InstructionSet:
         if self.cpu.registers["stk"] > self.cpu.memory.size:
             raise Exception("Stack underflow, attempt to pop from empty stack")
         if memloc is not None:
-            if memloc.startswith("@") and memloc[1:] in self.cpu.registers.registers.keys():
+            if memloc.startswith("@"):
                 self.cpu.registers[memloc.lstrip("@")] = self.cpu.memory[
                     self.cpu.registers["stk"]]
             else:

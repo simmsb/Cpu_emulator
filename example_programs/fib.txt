@@ -1,0 +1,42 @@
+call main
+halt
+_main NOP
+PUSH @LSTK
+MOV @STK @LSTK
+PUSH 0
+PUSH 1
+PUSH 0
+PUSH 0
+_jump_start_0 CMP [@lstk-4] 10
+meje jump_end_0
+PUSH [@lstk-1]
+PUSH [@lstk-2]
+POP @ACC
+POP @EAX
+ADD @EAX
+PUSH @ACC
+POP @ACC
+MOV @ACC [@lstk-3]
+PUSH [@lstk-2]
+POP @ACC
+MOV @ACC [@lstk-1]
+PUSH [@lstk-3]
+POP @ACC
+MOV @ACC [@lstk-2]
+PUSH [@lstk-4]
+PUSH 1
+POP @ACC
+POP @EAX
+ADD @EAX
+PUSH @ACC
+POP @ACC
+MOV @ACC [@lstk-4]
+JUMP jump_start_0
+_jump_end_0 NOP
+MOV 0 @RET
+MOV @LSTK @STK
+MOV [@STK] @LSTK
+MOV @STK @ACC
+ADD 1
+MOV @ACC @STK
+RET

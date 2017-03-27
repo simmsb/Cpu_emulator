@@ -5,7 +5,7 @@ from .addressparser import parseLocation
 from .memory import *
 from .opcodes import *
 
-INTERACTIVE = True
+INTERACTIVE = False
 
 
 class Registers:
@@ -34,18 +34,18 @@ class Registers:
 
     def __getitem__(self, key):
         if self.registers.get(key) is None:
-            raise CpuStoppedCall(f"Attemt to access nonexistant register, request was: {key}")
+            raise CpuStoppedCall("Attemt to access nonexistant register")
         return self.registers.get(key)
 
     def __setitem__(self, key, value):
         if self.registers.get(key) is not None:
             self.registers[key] = value
         else:
-            raise CpuStoppedCall(f"Attemt to set nonexistant register, req was: {key}, to be set to: {value}")
+            raise CpuStoppedCall("Attemt to access nonexistant register")
 
 
 class Cpu:
-    debugging = True
+    debugging = False
     """CPU that links instructions, memory and registers together
 
     Arguments
@@ -86,18 +86,7 @@ class Cpu:
             opcode = int(str(value)[:3])
             split_codes = self._split_every(str(value)[3:], 8)
             operands = ''.join([chr(int(i)) for i in split_codes]).split()
-            self.debug(self.registers.registers)
-            self.debug("Opcode was: {}".format(opcode))
-            self.debug("CMP is {}".format(self.registers["cmp"]))
-            self.debug("Operands were: {}".format(operands))
-            self.debug("Memory is: {}".format(self.memory.cells))
             self.instruction_set.run_encoded(opcode, *operands)
-            self.debug(f"stack: {self.memory.cells[self.registers['stk']:self.memory.size]}")
-            self.debug(f"stk: {self.registers['stk']}")
-            self.debug(f"lstk: {self.registers['lstk']}")
-            self.debug(f"cur: {self.registers['cur']}")
-            self.debug(f"ret: {self.registers['ret']}")
-            self.debug(f"current command: {self.instruction_set.encoded_commands[opcode].__name__}\n\n")
         except CpuStoppedCall as e:
             raise e  # re-raise here so we can ignore it
         except Exception as e:
@@ -111,35 +100,27 @@ class Cpu:
     def interpret_read_address(self, string):
         return parseLocation(string, self)
 
+    def run_once(self):
+        try:
+            current_instruction = self.memory[self.registers["cur"]]
+            self.registers["cur"] += 1  # increment counter
+            self._decode_numeric_command(current_instruction)
+        except CpuStoppedCall as e:
+            raise e
+
     def execute(self):
         while True:
-            try:
-                input("enter to run next iteration\n")
-                current_instruction = self.memory[self.registers["cur"]]
-                self.debug(f"cur is: {self.registers['cur']}")
-                self.debug(f"STK is: {self.registers['stk']}")
-                self.debug(f"LSTK is: {self.registers['lstk']}")
-                self.registers["cur"] += 1  # increment counter
-                self._decode_numeric_command(current_instruction)
-            except CpuStoppedCall as e:
-                print(e)
-                break
+            self.run_once()
 
 
 class Compiler:
     """Object that compiles a program for an instruction set
-
     Arguments
     ---------
-
     program_string: <List> or newline seperated string of instructions
-
     memory_size: <int> size of memory cells to give the program
-
-
     Functions
     ---------
-
     compiled: returns map object of compiled commands"""
 
     def __init__(self, program_string, memory_size):
@@ -177,13 +158,15 @@ class Compiler:
             if not self.instruction_set.encode_name(op) and not op.startswith("_"):
                 labels[op] = len(labels)  # next value is always
                 print(f"split: {split}")
-                label_values.append(int(split[1]) if len(split) > 1 else 0)
+                label_values.append(
+                    int(split[1]) if len(split) > 1 else 0)
                 temporary_commands.remove(c)  # cut from list
 
         for i, c in enumerate(temporary_commands):  # generate jumps
             split = c.split()
             op = split[0]
-            if not self.instruction_set.encode_name(op):  # is a jump
+            # is a jump
+            if not self.instruction_set.encode_name(op):
                 if op.startswith("_"):  # is a jump
                     named_jumps[op[1:]] = "{}".format(str(i))
                     temporary_commands[i] = " ".join(split[1:])
@@ -193,7 +176,8 @@ class Compiler:
         for i in temporary_commands:
             split = i.split()
             op = split[0]  # type: str
-            if self.instruction_set.encode_name(op):  # is a command
+            # is a command
+            if self.instruction_set.encode_name(op):
                 temp = i
                 for k, j in labels.items():
                     temp = self._replace_with_spaces(
@@ -216,7 +200,8 @@ class Compiler:
         command = self.instruction_set.encode_name(keys[0])
         if command:  # command exists
             operstring = ' '.join(keys[1:])
-            operands = ''.join([str(ord(k)).zfill(8) for k in operstring])
+            operands = ''.join([str(ord(k)).zfill(8)
+                                for k in operstring])
             return int(str(command) + operands)
         else:
             raise Exception

@@ -7,7 +7,6 @@ class Register:
         self.name = name
 
     def find(self, cpu):
-        print(f"cpu.registers = {cpu.registers.registers}")
         return cpu.registers[self.name.lower()]
 
     def __str__(self):
@@ -98,16 +97,10 @@ class LocationParse:
 def parseLocation(locstring, cpu):
     """
     Parse a location, returning it's result.
-
     [xxx] := value stored at memory location xxx
-
     a + b := value of a + value of b
-
     [a+1] := value contained at memory location (a + 1)
     """
-    cpu.debug(f"parsing location: {locstring}")
     data = LocationParse.parsed.parseString(locstring).asList()
-    cpu.debug(data)
     result = data[0].find(cpu)
-    cpu.debug(f"result was: {result}")
     return result
