@@ -34,14 +34,14 @@ class Registers:
 
     def __getitem__(self, key):
         if self.registers.get(key) is None:
-            raise CpuStoppedCall("Attemt to access nonexistant register")
+            raise Exception(f"Attemt to access nonexistant register {key}")
         return self.registers.get(key)
 
     def __setitem__(self, key, value):
         if self.registers.get(key) is not None:
             self.registers[key] = value
         else:
-            raise CpuStoppedCall("Attemt to access nonexistant register")
+            raise Exception(f"Attemt to access nonexistant register {key}")
 
 
 class Cpu:
@@ -68,6 +68,7 @@ class Cpu:
             self.memory.load_program(program)
         self.registers = Registers(self.memory.size)
         self.instruction_set = InstructionSet(self)
+        self.last_opcode = ""
 
     def debug(self, *args, **kwargs):
         if self.debugging:
@@ -87,12 +88,12 @@ class Cpu:
             split_codes = self._split_every(str(value)[3:], 8)
             operands = ''.join([chr(int(i)) for i in split_codes]).split()
             self.instruction_set.run_encoded(opcode, *operands)
+            self.last_opcode = f"{self.instruction_set.encoded_commands[opcode].__name__} {operands}"
         except CpuStoppedCall as e:
             raise e  # re-raise here so we can ignore it
         except Exception as e:
             print("Computer crashed!")
-            print("Last instruction was: {}".format(
-                self.instruction_set.encoded_commands[opcode].__name__))
+            print("Last instruction was: {}".format(self.last_opcode))
             print("operands were: {}".format(operands))
             print("exception was: {}".format(traceback.format_exc()))
             raise CpuStoppedCall("Computer Crashed Halt")

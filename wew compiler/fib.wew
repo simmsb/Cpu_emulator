@@ -1,3 +1,12 @@
+func printnum(int inp) {
+  program {
+    _asm {
+      PRNTINT [@LSTK+1],
+      PRNTNL
+    }
+  }
+}
+
 func main() {
     vars {
         int a;
@@ -11,6 +20,7 @@ func main() {
             a := b;
             b := temp;
             count := count + 1;
+            printnum(b);
         }
     }
 }

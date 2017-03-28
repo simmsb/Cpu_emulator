@@ -10,6 +10,8 @@ func main() {
     int size := 4;
   }
   program {
+    a[3] := 22;
+    a[2] := a[3];
     takesalist(a, size);
   }
 }

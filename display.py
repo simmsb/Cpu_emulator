@@ -40,7 +40,7 @@ def displayStack(scrn, stk):
     max_width = max(map(lambda a: len(str(a)), stk))
 
     for c, i in enumerate(stk):
-        scrn.addstr(c, 0, f"{MEM_SIZE - c:^5} -> |{i:^{max_width}}|")
+        scrn.addstr(c, 0, f"{MEM_SIZE-c-1:^5} -> |{i:^{max_width}}|")
 
     scrn.refresh()
 
@@ -53,6 +53,11 @@ def displayRegs(scrn, regs):
 
     scrn.refresh()
 
+def displayCmd(scrn):
+    scrn.clear()
+
+    scrn.addstr(0, 0, mycpu.last_opcode)
+    scrn.refresh()
 
 def main(stdscr):
     # Clear screen
@@ -60,11 +65,13 @@ def main(stdscr):
 
     stack = stdscr.derwin(20, 20, 0, 44)
     regs = stdscr.derwin(20, 20, 0, 0)
+    stuff = stdscr.derwin(20, 25, 21, 0)
 
     while True:
         displayStack(
-            stack, mycpu.memory.cells[MEM_SIZE:mycpu.registers["stk"]:-1])
+            stack, mycpu.memory.cells[MEM_SIZE:mycpu.registers["stk"]-1:-1])
         displayRegs(regs, mycpu.registers.registers)
+        displayCmd(stuff)
         stdscr.refresh()
         stdscr.getkey()
         mycpu.run_once()

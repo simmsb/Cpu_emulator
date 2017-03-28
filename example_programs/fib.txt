@@ -1,5 +1,17 @@
 call main
 halt
+_printnum NOP
+PUSH @LSTK
+MOV @STK @LSTK
+PRNTINT [@LSTK+1]
+PRNTNL
+MOV 0 @RET
+MOV @LSTK @STK
+MOV [@STK] @LSTK
+MOV @STK @ACC
+ADD 2
+MOV @ACC @STK
+RET
 _main NOP
 PUSH @LSTK
 MOV @STK @LSTK
@@ -16,13 +28,13 @@ POP @EAX
 ADD @EAX
 PUSH @ACC
 POP @ACC
-MOV @ACC [@lstk-3]
+MOV @ACC @lstk-3
 PUSH [@lstk-2]
 POP @ACC
-MOV @ACC [@lstk-1]
+MOV @ACC @lstk-1
 PUSH [@lstk-3]
 POP @ACC
-MOV @ACC [@lstk-2]
+MOV @ACC @lstk-2
 PUSH [@lstk-4]
 PUSH 1
 POP @ACC
@@ -30,7 +42,11 @@ POP @EAX
 ADD @EAX
 PUSH @ACC
 POP @ACC
-MOV @ACC [@lstk-4]
+MOV @ACC @lstk-4
+CALL printnum [@lstk-2]
+MOV @STK @ACC
+ADD 0
+MOV @ACC @STK
 JUMP jump_start_0
 _jump_end_0 NOP
 MOV 0 @RET

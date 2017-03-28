@@ -85,22 +85,24 @@ class LocationParse:
     combination = immediate ^ register ^ dereference
 
     addsub = pp.oneOf("+ -")
-    mathop = combination + pp.ZeroOrMore(addsub + combination)
+    mathop = combination + pp.OneOrMore(addsub + combination)
     mathop.setParseAction(lambda t: Math(*t))
 
     dereference << lsqrbrk + (mathop ^ combination) + rsqrbrk
     dereference.setParseAction(lambda t: Dereference(*t))
 
-    parsed = combination ^ mathop ^ dereference
+    parsed = mathop ^ combination ^ dereference
 
 
 def parseLocation(locstring, cpu):
     """
-    Parse a location, returning it's result.
+    Parse a location, returning it's result.
     [xxx] := value stored at memory location xxx
     a + b := value of a + value of b
     [a+1] := value contained at memory location (a + 1)
     """
+    cpu.debug(f"Getting Var: {locstring}")
     data = LocationParse.parsed.parseString(locstring).asList()
+    cpu.debug(f"Got: {data[0]}")
     result = data[0].find(cpu)
     return result

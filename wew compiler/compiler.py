@@ -47,7 +47,7 @@ class languageSyntaxOBbase:
     def set_parent(self, parent):
         self.parent = parent
 
-    def get_variable(self, VarName):
+    def get_variable(self, VarName, asref=False):
         """Finds stack position of a variable, bubbles up to the parent function"""
         if isinstance(VarName, int):
             return f"{VarName}"
@@ -58,7 +58,7 @@ class languageSyntaxOBbase:
 
         else:
             # this should bubble up to the parent function
-            return self.parent.get_variable(VarName)
+            return self.parent.get_variable(VarName, asref)
 
     @classmethod
     def assemble_list(cls, cmds):
@@ -172,7 +172,7 @@ class assignOP(languageSyntaxOBbase):
 
     def assemble(self):
         if isinstance(self.setter, str):
-            variable = self.get_variable(self.setter)
+            variable = self.get_variable(self.setter, asref=True)
         elif isinstance(self.setter, listIndexOB):
             variable = self.setter.location
         else:
@@ -412,7 +412,7 @@ class functionDefineOB(languageSyntaxOBbase):
 
     # gets the position of a local variable/ passed arg
 
-    def get_variable(self, VarName):
+    def get_variable(self, VarName, asref=False):
         '''
         returns a variables location in memory
 
@@ -443,12 +443,14 @@ class functionDefineOB(languageSyntaxOBbase):
             index = sum(i.length for i in self.params[
                         :self.params.index(VarName)]) + 1
             # if var was passed to program as a reference, just return it
+            if asref:
+                return f"@lstk+{index}"
             return f"[@lstk+{index}]"
         elif VarName in self.vars_:
             index = sum(i.length for i in self.vars_[
                         :self.vars_.index(VarName)]) + 1
             var = self.vars_[self.vars_.index(VarName)]
-            if var.isref:
+            if var.isref or asref:
                 # variable is located on the local stack frame, get a
                 # reference to it
                 return f"@lstk-{index}"
