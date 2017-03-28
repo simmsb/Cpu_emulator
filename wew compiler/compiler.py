@@ -144,8 +144,8 @@ class mathOP(languageSyntaxOBbase):
             if isinstance(i, int):
                 yield f"PUSH {i}"
             elif i in ["+", "-", "*", "/"]:
-                yield "POP @ACC"
                 yield "POP @EAX"
+                yield "POP @ACC"
                 yield f"{asm_map[i]} @EAX"
                 yield "PUSH @ACC"
             elif isinstance(i, str):

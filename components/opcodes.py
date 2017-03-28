@@ -179,17 +179,22 @@ class InstructionSet:
     @instruction()
     @exception_wrapper
     def prntint(self, memloc):
-        print(self.cpu.interpret_read_address(memloc), end="")
+        val = str(self.cpu.interpret_read_address(memloc))
+        print(val, end="")
+        self.cpu.stdout[-1] += val
 
     @instruction()
     @exception_wrapper
     def prntstr(self, memloc):
-        print(chr(self.cpu.interpret_read_address(memloc)), end='')
+        val = chr(self.cpu.interpret_read_address(memloc))
+        print(val, end='')
+        self.cpu.stdout[-1] += val
 
     @instruction()
     @exception_wrapper
     def prntnl(self):
         print("\n")
+        self.cpu.stdout.append("")
 
     @instruction(alt="input")
     @exception_wrapper

@@ -69,6 +69,7 @@ class Cpu:
         self.registers = Registers(self.memory.size)
         self.instruction_set = InstructionSet(self)
         self.last_opcode = ""
+        self.stdout = [""]
 
     def debug(self, *args, **kwargs):
         if self.debugging:

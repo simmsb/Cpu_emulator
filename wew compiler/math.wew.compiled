@@ -39,7 +39,7 @@ POP @EAX
 MUL @EAX
 PUSH @ACC
 POP @ACC
-MOV @ACC [@lstk-2]
+MOV @ACC @lstk-2
 CALL printint [@lstk-2]
 MOV @STK @ACC
 ADD 0
