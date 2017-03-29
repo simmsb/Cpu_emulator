@@ -340,7 +340,7 @@ class functionCallOB(languageSyntaxOBbase):
             elif isinstance(i, str):
                 vars_ << ("var", self.get_variable(i))
             elif isinstance(i, listIndexOB):
-                vars_ << ("var", i.location)  # pass by ref, dont wrap in deref
+                vars_ << ("var", "[" + i.location + "]")
             elif isinstance(i, mathOP):
                 for k in i.assemble():
                     yield k
