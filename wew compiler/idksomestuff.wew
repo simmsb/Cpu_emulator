@@ -1,29 +1,30 @@
-func printnum(int val) {
+func putchar(int val) {
     program {
         _asm {
-            PRNTINT [@LSTK+1],
-            PRNTNL
+            PRNTSTR [@LSTK+1]
         }
     }
 }
 
-func printlist(list lst, int size) {
+func printlist(list lst) {
     vars {
+        int val := 1;
         int counter;
     }
     program {
-        while (counter < size) {
-            printnum(lst[counter]);
+        while (val > 0) {
+            putchar(lst[counter]);
             counter := counter + 1;
+            val := lst[counter];
         }
     }
 }
 
 func main() {
     vars {
-        list mylist[0] := "testing wew lad";
+        list mylist[] := "testing wew lad\n";
     }
     program {
-        printlist(mylist, 14);
+        printlist(mylist);
     }
 }

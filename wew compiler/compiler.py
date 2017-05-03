@@ -1,4 +1,3 @@
-import copy
 from formatter import format_string
 
 import pyparsing as pp
@@ -69,7 +68,6 @@ class languageSyntaxOBbase:
             yield from cmds.assemble()
 
     def assemble(self):
-        out = no_depth_list()
         yield from self.assemble_list(self.children)
 
     @property
@@ -137,7 +135,6 @@ class mathOP(languageSyntaxOBbase):
                     resolved.append(i)
             return resolved
 
-        out = no_depth_list()
         parsed = parse(self.children)
         debug(parsed)
         for i in parsed:
@@ -180,24 +177,40 @@ class assignOP(languageSyntaxOBbase):
         right_side = self.val.assemble()
         # output of right_side always ends in @ACC
 
-        out = no_depth_list()
         yield from right_side
         yield f"MOV @ACC {variable}"
 
 
 class variableOB(languageSyntaxOBbase):
 
-    def __init__(self, type, name, part=None, listinitial=None):
+    def escape_char(self, char):
+        d = {
+            "n": "\n",
+            "r": "\r"
+        }
+        return d.get(char, char)
+
+    def escape_string(self, string):
+        i = 0
+        while i < len(string):
+            if string[i] == "\\":
+                i += 1
+                yield self.escape_char(string[i])
+            else:
+                yield string[i]
+            i += 1
+
+    def __init__(self, type, name, part=None, listinitial=None, *rest):
         # if int: (type=type, name=name, part=initial)
-        # if list: (type=type, name=name, part=length)
+        # if list: (type=type, name=name, part=length, listinitial=default)
         super().__init__()
-        print(f"VARIABLE: name {name}, type {type}, part {part}, lstninit {listinitial}")
+        print(f"VARIABLE: name {name}, type {type}, part {part}, lstninit {listinitial}, rest: {rest}")
         self.type = type
         self.name = name
         if self.type == "list":
             if part is None and listinitial is not None:
-                self.length = len(listinitial)
-                self.initial = map(ord, listinitial)
+                self.length = len(listinitial) + 1
+                self.initial = map(ord, self.escape_string(listinitial + "\0"))
             elif listinitial is not None and part is not None:
                 self.length = part
                 self.initial = [listinitial] * part
@@ -231,7 +244,6 @@ class programList(languageSyntaxOBbase):
         super().__init__(*children)
 
     def assemble(self):
-        out = no_depth_list()
         yield from self.assemble_list(self.children)
 
 
@@ -283,7 +295,6 @@ class whileTypeOB(ComparisonVar):
             self, ", ".join(str(i) for i in self.codeblock))
 
     def assemble(self):
-        out = no_depth_list()
         yield f"_jump_start_{self.JID} CMP {self.parseitem(self.comp.left)} {self.parseitem(self.comp.right)}"
         yield f"{self.comp.comp} jump_end_{self.JID}"
         yield from self.assemble_list(self.codeblock)
@@ -475,7 +486,6 @@ class functionDefineOB(languageSyntaxOBbase):
     def assemble(self):
         # functions are jumped to with stack looking like: [ret, a, b, c]
         # we push lstk, then the function args
-        out = no_depth_list()
         yield f"_{self.name} NOP"
         # save previous base pointer [ret, a, b, c, lstk]
         yield "PUSH @LSTK"
@@ -501,7 +511,6 @@ class returnStmtOB(languageSyntaxOBbase):
         self.returnVar = returnVar
 
     def assemble(self):
-        out = no_depth_list()
         """
         how to return:
             move returned variable to @RET
@@ -533,6 +542,11 @@ class inlineAsmOB(languageSyntaxOBbase):
 
     def assemble(self):
         return self.asm
+
+
+def wrapped_elem(wrapper, elem):
+    wrap = pp.Literal(wrapper).suppress()
+    return wrap + elem + wrap
 
 
 class atoms:
@@ -574,7 +588,8 @@ class atoms:
     # attempt to parse a listindex first, since otherwise a variable will be
     # parsed by mistake
     operand = listindex | integer | variable
-    text = pp.Word(pp.alphanums + "_ $[]+-@")
+    text = pp.Word(pp.alphanums + "_ $[]+-@\\")
+
 
 class FuncCallSolver:
     functionCall = pp.Forward()
@@ -656,7 +671,7 @@ class ProgramObjects:
 
 class FunctionDefineParser:
 
-    var_assign_line = atoms.typedvar + atoms.equals + (atoms.integer | atoms.text) + atoms.semicol
+    var_assign_line = atoms.typedvar + atoms.equals + (atoms.integer | wrapped_elem('"', atoms.text)) + atoms.semicol
     var_assign_line.setParseAction(lambda s, l, t: variableOB(*t))
 
     var_noassign_line = atoms.typedvar + atoms.semicol
@@ -710,8 +725,8 @@ def load_parse(fname):
             with open(f"{fname}.compiled", "w+") as f:
                 f.writelines("\n".join(compiled))
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     import sys
 
     if __name__ == '__main__':
