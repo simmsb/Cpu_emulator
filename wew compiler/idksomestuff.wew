@@ -21,12 +21,9 @@ func printlist(list lst, int size) {
 
 func main() {
     vars {
-        list mylist[8] := 4;
+        list mylist[0] := "testing wew lad";
     }
     program {
-        mylist[4] := 3;
-        mylist[2] := 2;
-        mylist[7] := 888;
-        printlist(mylist, 8);
+        printlist(mylist, 14);
     }
 }

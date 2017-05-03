@@ -187,26 +187,33 @@ class assignOP(languageSyntaxOBbase):
 
 class variableOB(languageSyntaxOBbase):
 
-    def __init__(self, type, name, part=0, listinital=None):
+    def __init__(self, type, name, part=None, listinitial=None):
         # if int: (type=type, name=name, part=initial)
         # if list: (type=type, name=name, part=length)
         super().__init__()
-        print(f"VARIABLE: name {name}, type {type}, part {part}, lstninit {listinital}")
+        print(f"VARIABLE: name {name}, type {type}, part {part}, lstninit {listinitial}")
         self.type = type
         self.name = name
         if self.type == "list":
-            self.length = part
-            self.initial = listinital
+            if part is None and listinitial is not None:
+                self.length = len(listinitial)
+                self.initial = map(ord, listinitial)
+            elif listinitial is not None and part is not None:
+                self.length = part
+                self.initial = [listinitial] * part
+            else:
+                self.length = None
+                self.initial = [None]
             self.isref = True
         else:
             self.isref = False
-            self.initial = part
+            self.initial = 0 if part is None else part
             self.length = 1
 
     def create(self):
         if self.type == "list":
-            for i in range(self.length):
-                yield f"PUSH {self.initial}"  # create stack space
+            for i in self.initial:
+                yield f"PUSH {i}"  # create stack space
         else:
             yield f"PUSH {self.initial}"
 
@@ -556,7 +563,7 @@ class atoms:
     intvar = pp.Keyword("int") + variable  # ['int', name]
     listype = pp.Keyword("list") + variable
     listvar = (listype + lsqrbrk +
-               integer + rsqrbrk)  # ['list', name, size]
+               pp.Optional(integer, default=None) + rsqrbrk)  # ['list', name, size]
     typedvar = listvar | intvar
 
     initTypedVar = (intvar | listype).setParseAction(lambda t: variableOB(*t))
@@ -567,7 +574,7 @@ class atoms:
     # attempt to parse a listindex first, since otherwise a variable will be
     # parsed by mistake
     operand = listindex | integer | variable
-
+    text = pp.Word(pp.alphanums + "_ $[]+-@")
 
 class FuncCallSolver:
     functionCall = pp.Forward()
@@ -602,8 +609,7 @@ class returnStatement:
 class inlineAsm:
 
     asm = (pp.Keyword("_asm").suppress() + atoms.opening_curly_bracket +
-           pp.Word(pp.alphanums + "_ $[]+-@") +
-           pp.ZeroOrMore(atoms.comma + pp.Word(pp.alphanums + "_ $[]+-@")) +
+           atoms.text + pp.ZeroOrMore(atoms.comma + atoms.text) +
            atoms.closing_curly_bracket()).setParseAction(lambda t: inlineAsmOB(*t))
 
 
@@ -650,7 +656,7 @@ class ProgramObjects:
 
 class FunctionDefineParser:
 
-    var_assign_line = atoms.typedvar + atoms.equals + atoms.integer + atoms.semicol
+    var_assign_line = atoms.typedvar + atoms.equals + (atoms.integer | atoms.text) + atoms.semicol
     var_assign_line.setParseAction(lambda s, l, t: variableOB(*t))
 
     var_noassign_line = atoms.typedvar + atoms.semicol
