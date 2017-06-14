@@ -2,6 +2,8 @@
 
 A python version of the Little man computer
 
+Note: I no longer work on this and am now focusing on a design that is *actually* good [here](https://github.com/nitros12/some_instruction_set)
+
 # Description
 
 This language is very simple. It has support for arithmetic operations, moving data around, printing integers/ characters to stdout, jumping, conditional jumps and waiting for user input.
