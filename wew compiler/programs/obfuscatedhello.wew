@@ -1,0 +1,30 @@
+func putchar(int val) {
+    program {
+        _asm {
+            PRNTSTR [@LSTK+1]
+        }
+    }
+}
+
+func printlist(list lst) {
+    vars {
+        int val := 1;
+        int counter;
+    }
+    program {
+        while (val > 0) {
+            putchar(lst[counter]);
+            counter := counter + 1;
+            val := lst[counter];
+        }
+    }
+}
+
+func main() {
+    vars {
+        list mylist[] := "hello world\n";
+    }
+    program {
+        printlist(mylist);
+    }
+}

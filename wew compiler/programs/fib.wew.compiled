@@ -23,8 +23,8 @@ _jump_start_0 CMP [@lstk-4] 10
 meje jump_end_0
 PUSH [@lstk-1]
 PUSH [@lstk-2]
-POP @ACC
 POP @EAX
+POP @ACC
 ADD @EAX
 PUSH @ACC
 POP @ACC
@@ -37,8 +37,8 @@ POP @ACC
 MOV @ACC @lstk-2
 PUSH [@lstk-4]
 PUSH 1
-POP @ACC
 POP @EAX
+POP @ACC
 ADD @EAX
 PUSH @ACC
 POP @ACC

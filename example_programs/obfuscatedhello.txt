@@ -1,0 +1,71 @@
+call main
+halt
+_putchar NOP
+PUSH @LSTK
+MOV @STK @LSTK
+PRNTSTR [@LSTK+1]
+MOV 0 @RET
+MOV @LSTK @STK
+MOV [@STK] @LSTK
+MOV @STK @ACC
+ADD 2
+MOV @ACC @STK
+RET
+_printlist NOP
+PUSH @LSTK
+MOV @STK @LSTK
+PUSH 1
+PUSH 0
+_jump_start_0 CMP [@lstk-1] 0
+leje jump_end_0
+CALL putchar [[@lstk+1]-[@lstk-2]]
+MOV @STK @ACC
+ADD 0
+MOV @ACC @STK
+PUSH [@lstk-2]
+PUSH 1
+POP @EAX
+POP @ACC
+ADD @EAX
+PUSH @ACC
+POP @ACC
+MOV @ACC @lstk-2
+PUSH [[@lstk+1]-[@lstk-2]]
+POP @ACC
+MOV @ACC @lstk-1
+JUMP jump_start_0
+_jump_end_0 NOP
+MOV 0 @RET
+MOV @LSTK @STK
+MOV [@STK] @LSTK
+MOV @STK @ACC
+ADD 2
+MOV @ACC @STK
+RET
+_main NOP
+PUSH @LSTK
+MOV @STK @LSTK
+PUSH 104
+PUSH 101
+PUSH 108
+PUSH 108
+PUSH 111
+PUSH 32
+PUSH 119
+PUSH 111
+PUSH 114
+PUSH 108
+PUSH 100
+PUSH 10
+PUSH 0
+CALL printlist @lstk-1
+MOV @STK @ACC
+ADD 0
+MOV @ACC @STK
+MOV 0 @RET
+MOV @LSTK @STK
+MOV [@STK] @LSTK
+MOV @STK @ACC
+ADD 1
+MOV @ACC @STK
+RET

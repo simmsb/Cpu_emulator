@@ -728,8 +728,6 @@ def load_parse(fname):
 
 if __name__ == "__main__":
     import sys
-
-    if __name__ == '__main__':
-        for i in sys.argv[1:]:
-            print(f"compiling {i}")
-            load_parse(i)
+    for i in sys.argv[1:]:
+        print(f"compiling {i}")
+        load_parse(i)
